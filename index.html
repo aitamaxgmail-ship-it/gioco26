@@ -1,1 +1,1674 @@
 
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Game & Web Radio Hub - gioco26 Edition</title>
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <style>
+    :root {
+      --bg-dark: #0f172a;
+      --panel-bg: #1e293b;
+      --accent: #6366f1;
+      --accent-hover: #4f46e5;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --border: #334155;
+      --green: #22c55e;
+      --red: #ef4444;
+      --yellow: #eab308;
+      --card-bg: #fffdf5;
+      --cell-size: 24px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+    body { background-color: var(--bg-dark); color: var(--text); height: 100vh; display: flex; overflow: hidden; }
+
+    .app-layout { display: flex; width: 100vw; height: 100vh; overflow: hidden; }
+    .main-section { flex: 1; display: flex; flex-direction: column; gap: 0.4rem; padding: 0.5rem; border-right: 2px solid var(--border); overflow: hidden; height: 100vh; }
+
+    /* BARRA DI NAVIGAZIONE E SELEZIONE NOMI GIOCATORI */
+    .game-nav { display: flex; gap: 0.3rem; justify-content: space-between; align-items: center; background: var(--panel-bg); padding: 0.4rem; border-radius: 8px; border: 1px solid var(--border); flex-shrink: 0; }
+    .tab-btn { background: #334155; color: white; border: none; padding: 0.3rem 0.5rem; border-radius: 5px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 0.75rem; }
+    .tab-btn.active, .tab-btn:hover { background: var(--accent); }
+    .mode-select, .player-input { background: #0f172a; color: white; border: 1px solid var(--border); padding: 0.25rem 0.4rem; border-radius: 5px; font-size: 0.75rem; outline: none; }
+
+    /* UTENZA ONLINE GIOCO26 */
+    .online-box { display: flex; align-items: center; justify-content: space-between; background: #0f172a; padding: 0.3rem 0.6rem; border-radius: 6px; border: 1px solid var(--accent); font-size: 0.7rem; flex-shrink: 0; }
+    .user-badge { background: var(--accent); color: white; padding: 0.15rem 0.4rem; border-radius: 4px; font-weight: bold; font-family: monospace; }
+    .player-limit-tag { background: #334155; color: var(--yellow); padding: 0.15rem 0.4rem; border-radius: 4px; font-weight: bold; font-size: 0.7rem; }
+
+    /* TABELLA PUNTEGGI INDIPENDENTI PER ENTRAMBI I GIOCATORI */
+    .scoreboard-box { background: #0f172a; border: 1px solid var(--border); border-radius: 6px; padding: 0.3rem 0.6rem; font-size: 0.7rem; flex-shrink: 0; }
+    .scoreboard-table { width: 100%; border-collapse: collapse; text-align: center; }
+    .scoreboard-table th, .scoreboard-table td { padding: 0.15rem 0.3rem; border-bottom: 1px solid #1e293b; font-size: 0.7rem; }
+    .scoreboard-table th { color: var(--accent); font-weight: bold; }
+
+    /* CONTAINER PRINCIPALE GIOCO */
+    .game-card { background: var(--panel-bg); border-radius: 10px; padding: 0.6rem; text-align: center; flex: 1; display: flex; flex-direction: column; justify-content: space-between; align-items: center; border: 1px solid var(--border); overflow-y: auto; position: relative; }
+    .game-title { font-size: 1rem; font-weight: 700; color: #38bdf8; }
+    .status-msg { font-size: 0.75rem; font-weight: 600; color: var(--text-muted); background: rgba(0,0,0,0.3); padding: 0.2rem 0.6rem; border-radius: 12px; max-width: 95%; margin: 0.2rem 0; }
+
+    /* BANNER RISULTATO */
+    .result-banner { display: none; width: 100%; padding: 0.4rem; border-radius: 6px; font-weight: 800; font-size: 0.85rem; text-align: center; margin-bottom: 0.2rem; }
+    .result-banner.win { background: #15803d; color: #fef08a; border: 1px solid #22c55e; }
+    .result-banner.loss { background: #991b1b; color: #fecaca; border: 1px solid #ef4444; }
+
+    /* NOME COSE CITTA ANIMAL MESTIERE FRUTTA STYLES */
+    .ncc-container { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; width: 100%; max-width: 700px; }
+    .wheel-container { position: relative; width: 140px; height: 140px; margin: 0.2rem 0; }
+    .wheel-pointer { position: absolute; top: -8px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-top: 16px solid #ef4444; z-index: 10; }
+    canvas#wheelCanvas { width: 140px; height: 140px; border-radius: 50%; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
+    
+    .ncc-form-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.3rem; width: 100%; }
+    .ncc-field-box { display: flex; flex-direction: column; text-align: left; }
+    .ncc-field-box label { font-size: 0.62rem; color: var(--text-muted); font-weight: bold; text-transform: uppercase; margin-bottom: 2px; }
+    .ncc-field-input { background: #0f172a; border: 1px solid var(--border); border-radius: 4px; color: white; padding: 0.3rem; font-size: 0.72rem; width: 100%; outline: none; }
+    .ncc-field-input:disabled { background: #1e293b; opacity: 0.7; }
+
+    .timer-badge { font-size: 1.1rem; font-weight: 800; color: var(--yellow); background: #0f172a; padding: 0.2rem 0.8rem; border-radius: 20px; border: 1px solid var(--yellow); display: inline-flex; align-items: center; gap: 0.4rem; }
+
+    /* TABELLA EREDITATA DALL'IMMAGINE PROPOSTA */
+    .ncc-grid-table { width: 100%; border-collapse: collapse; margin-top: 0.4rem; background: #ffffff; color: #000000; border: 2px solid #000000; font-size: 0.75rem; }
+    .ncc-grid-table th, .ncc-grid-table td { border: 1px solid #000000; padding: 0.3rem; text-align: center; }
+    .ncc-grid-table th { background: #f1f5f9; font-weight: bold; color: #000000; }
+    .ncc-player-row-title { font-weight: bold; background: #e2e8f0; text-align: left !important; padding-left: 0.4rem !important; }
+    .pts-badge { font-weight: bold; display: block; font-size: 0.65rem; }
+    .pts-10 { color: #166534; }
+    .pts-5 { color: #b45309; }
+    .pts-0 { color: #991b1b; }
+
+    /* BATTAGLIA NAVALE & CONTATORE NAVI */
+    .naval-boards-wrapper { display: flex; gap: 0.8rem; justify-content: center; width: 100%; }
+    .board-container { display: flex; flex-direction: column; align-items: center; gap: 0.2rem; }
+    .board-label { font-size: 0.7rem; font-weight: bold; color: var(--accent); }
+    .naval-board { display: grid; gap: 2px; justify-content: center; padding: 3px; background: #0f172a; border-radius: 6px; border: 1px solid var(--border); }
+    .naval-cell { width: var(--cell-size); height: var(--cell-size); background: #1e3a8a; border-radius: 2px; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; cursor: pointer; user-select: none; }
+    .naval-cell.ship { background: #475569; }
+    .naval-cell.hit { background: #ef4444 !important; }
+    .naval-cell.miss { background: #334155 !important; }
+    
+    .naval-stats-bar { display: flex; gap: 0.6rem; justify-content: center; width: 100%; margin-bottom: 0.3rem; }
+    .naval-stat-box { background: #0f172a; border: 1px solid var(--border); padding: 0.25rem 0.5rem; border-radius: 6px; font-size: 0.68rem; text-align: center; flex: 1; max-width: 220px; }
+    .naval-stat-box b { color: #38bdf8; }
+
+    /* DAMA TRADIZIONALE */
+    .dama-board { display: grid; grid-template-columns: repeat(8, 34px); grid-template-rows: repeat(8, 34px); gap: 0; border: 3px solid #334155; border-radius: 4px; }
+    .dama-cell { width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; cursor: pointer; position: relative; }
+    .dama-cell.light { background: #f0d9b5; }
+    .dama-cell.dark { background: #b58863; }
+    .dama-piece { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.7rem; box-shadow: 0 2px 4px rgba(0,0,0,0.4); }
+    .dama-piece.white { background: #ffffff; color: #000; border: 2px solid #ccc; }
+    .dama-piece.black { background: #262421; color: #fff; border: 2px solid #555; }
+
+    /* CARTE NAPOLETANE COMPATTE */
+    .cards-board { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; width: 100%; max-width: 480px; }
+    .table-cards-zone { display: flex; gap: 0.4rem; justify-content: center; min-height: 90px; background: #064e3b; padding: 0.4rem; border-radius: 8px; width: 100%; border: 2px solid #047857; align-items: center; position: relative; }
+    .player-hand-zone { display: flex; gap: 0.4rem; justify-content: center; }
+    .napoletana-card { width: 55px; height: 85px; background: var(--card-bg); border-radius: 6px; border: 1.5px solid #8c7355; display: flex; flex-direction: column; justify-content: space-between; padding: 0.2rem; cursor: pointer; color: #1e293b; position: relative; font-size: 0.7rem; }
+    .suit-denari { color: #b45309; background: #fef3c7; }
+    .suit-coppe { color: #991b1b; background: #fee2e2; }
+    .suit-bastoni { color: #166534; background: #dcfce7; }
+    .suit-spade { color: #1e40af; background: #dbeafe; }
+
+    /* SIDEBAR VERTICALE DESTRA (CHAT + RADIO INTEGRATE IN VERTICALE) */
+    .sidebar-right { width: 260px; background: #18181c; padding: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem; flex-shrink: 0; border-left: 2px solid var(--border); height: 100vh; overflow: hidden; }
+
+    .chat-card { background: var(--panel-bg); border-radius: 8px; border: 1px solid var(--border); flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 200px; }
+    .chat-header { font-size: 0.75rem; font-weight: 700; padding: 0.3rem 0.5rem; background: #0f172a; border-bottom: 1px solid var(--border); color: var(--accent); }
+    .chat-messages { flex: 1; padding: 0.3rem; overflow-y: auto; font-size: 0.7rem; display: flex; flex-direction: column; gap: 0.2rem; }
+    .chat-msg { background: #0f172a; padding: 0.2rem 0.4rem; border-radius: 4px; word-break: break-word; }
+    .chat-input-row { display: flex; padding: 0.3rem; gap: 0.3rem; background: #0f172a; border-top: 1px solid var(--border); }
+
+    .sidebar-radio { background: var(--panel-bg); border-radius: 8px; border: 1px solid var(--border); padding: 0.5rem; display: flex; flex-direction: column; gap: 0.4rem; flex: 1; overflow: hidden; min-height: 200px; }
+    .radio-list { display: flex; flex-direction: column; gap: 0.25rem; overflow-y: auto; flex: 1; }
+    .radio-card { display: flex; align-items: center; justify-content: space-between; background: #0f172a; padding: 0.3rem 0.5rem; border-radius: 6px; cursor: pointer; font-size: 0.7rem; }
+
+    .btn { background: var(--accent); color: white; border: none; padding: 0.3rem 0.6rem; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 0.75rem; }
+    .btn-stop { background: var(--red); }
+    .btn-success { background: var(--green); }
+
+    /* ADATTAMENTO RESPONSIVO PER TELEFONINI */
+    @media (max-width: 768px) {
+      .app-layout { flex-direction: column; overflow-y: auto; height: auto; }
+      .main-section { height: auto; border-right: none; border-bottom: 2px solid var(--border); }
+      .sidebar-right { width: 100%; height: auto; border-left: none; }
+      .naval-boards-wrapper { flex-direction: column; align-items: center; }
+      .ncc-form-row { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="app-layout">
+    
+    <!-- SEZIONE PRINCIPALE -->
+    <div class="main-section">
+      
+      <!-- NAVIGAZIONE GIOCHI E NOMI GIOCATORI -->
+      <div class="game-nav">
+        <div style="display: flex; gap: 0.2rem; flex-wrap: wrap;">
+          <button class="tab-btn active" onclick="switchGame('battaglia')">⚓ Battaglia</button>
+          <button class="tab-btn" onclick="switchGame('dama')">⚪⚫ Dama</button>
+          <button class="tab-btn" onclick="switchGame('ncc')">✏️ Nome Cose Città</button>
+          <button class="tab-btn" onclick="switchGame('briscola')">🃏 Briscola</button>
+          <button class="tab-btn" onclick="switchGame('scopa')">🧹 Scopa</button>
+          <button class="tab-btn" onclick="switchGame('impiccato')">🔤 Impiccato</button>
+          <button class="tab-btn" onclick="switchGame('tris')">❌⭕ Tris</button>
+        </div>
+        <div style="display:flex; gap:0.2rem; align-items:center;">
+          <button class="btn" style="padding:0.25rem 0.4rem; font-size:0.7rem;" onclick="promptPlayerName()" title="Scegli il tuo nome">👤 Scegli Nome</button>
+          <input type="text" id="playerNameInput" class="player-input" value="Giocatore 1" oninput="updatePlayerNames()" onchange="updatePlayerNames()" placeholder="G1" style="width:80px;" title="Nome Giocatore 1">
+          <span style="font-size:0.7rem; color:var(--text-muted); font-weight:bold;">VS</span>
+          <input type="text" id="opponentNameInput" class="player-input" value="Bot" oninput="updatePlayerNames()" onchange="updatePlayerNames()" placeholder="G2 / Bot" style="width:80px;" title="Nome Giocatore 2 / Bot">
+          <select id="opponentMode" class="mode-select" onchange="handleModeChange()">
+            <option value="bot">🤖 Sfida Bot</option>
+            <option value="online">📱 Online</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- UTENZA ONLINE GIOCO26 -->
+      <div class="online-box">
+        <div>Utenza gioco26: <span class="user-badge" id="myPeerId">Generazione...</span></div>
+        <div style="display:flex; gap:0.3rem; align-items:center;">
+          <span class="player-limit-tag" id="ruleLimitTag">Capacità: 2 Giocatori</span>
+          <input type="text" id="targetPeerInput" class="player-input" placeholder="Codice gioco26" style="width:110px;">
+          <button class="btn btn-success" onclick="connectToPeer()">🔗 Connetti</button>
+        </div>
+      </div>
+
+      <!-- SEGNAPUNTI INDIPENDENTI -->
+      <div class="scoreboard-box">
+        <table class="scoreboard-table">
+          <thead>
+            <tr>
+              <th>Giocatore</th>
+              <th>⚓ Battaglia</th>
+              <th>⚪ Dama</th>
+              <th>✏️ N.C.C.</th>
+              <th>🃏 Briscola</th>
+              <th>🧹 Scopa</th>
+              <th>🔤 Impiccato</th>
+              <th>❌ Tris</th>
+            </tr>
+          </thead>
+          <tbody id="scoreboardBody"></tbody>
+        </table>
+      </div>
+
+      <!-- SCHERMO DI GIOCO ADATTIVO -->
+      <div class="game-card">
+        <div class="game-title" id="gameTitle">⚓ Battaglia Navale</div>
+        
+        <div id="resultBanner" class="result-banner"></div>
+        <div class="status-msg" id="statusMsg">Caricamento...</div>
+        
+        <div id="gameContainer" style="width:100%; flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; overflow:hidden;"></div>
+        
+        <div style="display:flex; gap:0.4rem; margin-top: 0.3rem;">
+          <button class="btn" onclick="resetCurrentGame()">🔄 Nuova Partita</button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- SIDEBAR VERTICALE DESTRA (CHAT + RADIO) -->
+    <div class="sidebar-right">
+      
+      <!-- CHAT LIVE VERTICALE -->
+      <div class="chat-card">
+        <div class="chat-header">💬 Chat Live Online</div>
+        <div class="chat-messages" id="chatLogs">
+          <div class="chat-msg"><span style="color:var(--accent); font-weight:bold;">Sistema:</span> Benvenuto nella piattaforma gioco26!</div>
+        </div>
+        <div class="chat-input-row">
+          <input type="text" id="chatInput" class="chat-input player-input" style="flex:1;" placeholder="Scrivi..." onkeydown="if(event.key==='Enter') sendChatMessage()">
+          <button class="btn" onclick="sendChatMessage()">Invia</button>
+        </div>
+      </div>
+
+      <!-- SIDEBAR RADIO MULTICANALE -->
+      <div class="sidebar-radio">
+        <div style="font-size:0.8rem; font-weight:700;">📻 Web Radio Live</div>
+        <div style="background:#0f172a; padding:0.4rem; border-radius:6px; text-align:center; border:1px solid var(--border);">
+          <div id="stName" style="font-size:0.75rem; font-weight:bold; color:var(--green);">RAI Radio 1</div>
+          <audio id="audioPlayer" controls style="width:100%; height:28px; margin-top:0.2rem;" src="https://icestreaming.rai.it/1.mp3"></audio>
+        </div>
+        <div class="radio-list" id="radioList"></div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    // --- SINTETIZZATORE AUDIO & TICCHETTIO OROLOGIO ---
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    function playTickSound() {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.05);
+    }
+
+    function playSound(type) {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      
+      if (type === 'win') {
+        const notes = [523.25, 659.25, 783.99, 1046.50];
+        notes.forEach((freq, idx) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.value = freq;
+          gain.gain.setValueAtTime(0.15, audioCtx.currentTime + idx * 0.12);
+          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + idx * 0.12 + 0.3);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(audioCtx.currentTime + idx * 0.12);
+          osc.stop(audioCtx.currentTime + idx * 0.12 + 0.3);
+        });
+      } else if (type === 'loss') {
+        const notes = [300, 260, 220, 180];
+        notes.forEach((freq, idx) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.value = freq;
+          gain.gain.setValueAtTime(0.15, audioCtx.currentTime + idx * 0.15);
+          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + idx * 0.15 + 0.35);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(audioCtx.currentTime + idx * 0.15);
+          osc.stop(audioCtx.currentTime + idx * 0.15 + 0.35);
+        });
+      }
+    }
+
+    function showGameResult(isWin, winnerName, loserName) {
+      const banner = document.getElementById('resultBanner');
+      banner.style.display = 'block';
+      if(isWin) {
+        banner.className = 'result-banner win';
+        banner.innerHTML = `🏆 VITTORIA! Vincitore: ${winnerName} | 💀 Sconfitto: ${loserName}`;
+        playSound('win');
+      } else {
+        banner.className = 'result-banner loss';
+        banner.innerHTML = `💀 SCONFITTA! Vincitore: ${winnerName} | 😭 Perditore: ${loserName}`;
+        playSound('loss');
+      }
+    }
+
+    function hideResultBanner() {
+      document.getElementById('resultBanner').style.display = 'none';
+    }
+
+    // --- PUNTEGGI INDIPENDENTI E SCELTA NOME GIOCATORE ---
+    let playerName = "Giocatore 1";
+    let opponentName = "Bot";
+    let scores = { battaglia: 0, dama: 0, ncc: 0, briscola: 0, scopa: 0, impiccato: 0, tris: 0 };
+    let opponentScores = { battaglia: 0, dama: 0, ncc: 0, briscola: 0, scopa: 0, impiccato: 0, tris: 0 };
+
+    function promptPlayerName() {
+      const newName = prompt("Inserisci il nome del giocatore:", playerName);
+      if (newName !== null && newName.trim() !== "") {
+        playerName = newName.trim();
+        document.getElementById('playerNameInput').value = playerName;
+        updatePlayerNames();
+      }
+    }
+
+    function updatePlayerNames() {
+      const inputP1 = document.getElementById('playerNameInput').value.trim();
+      const inputP2 = document.getElementById('opponentNameInput').value.trim();
+      playerName = inputP1 !== "" ? inputP1 : "Giocatore 1";
+      opponentName = inputP2 !== "" ? inputP2 : "Bot";
+      renderScoreboard();
+    }
+
+    function addWin(gameKey) {
+      scores[gameKey]++;
+      renderScoreboard();
+    }
+
+    function addOpponentWin(gameKey) {
+      opponentScores[gameKey]++;
+      renderScoreboard();
+    }
+
+    function renderScoreboard() {
+      const body = document.getElementById('scoreboardBody');
+      body.innerHTML = `
+        <tr>
+          <td style="font-weight:bold; color:#38bdf8;">${playerName}</td>
+          <td>${scores.battaglia}</td>
+          <td>${scores.dama}</td>
+          <td>${scores.ncc}</td>
+          <td>${scores.briscola}</td>
+          <td>${scores.scopa}</td>
+          <td>${scores.impiccato}</td>
+          <td>${scores.tris}</td>
+        </tr>
+        <tr>
+          <td style="font-weight:bold; color:#ef4444;">${opponentName}</td>
+          <td>${opponentScores.battaglia}</td>
+          <td>${opponentScores.dama}</td>
+          <td>${opponentScores.ncc}</td>
+          <td>${opponentScores.briscola}</td>
+          <td>${opponentScores.scopa}</td>
+          <td>${opponentScores.impiccato}</td>
+          <td>${opponentScores.tris}</td>
+        </tr>
+      `;
+    }
+    renderScoreboard();
+
+    // --- REGOLE E LIMITI GIOCATORI ONLINE ---
+    const GAME_RULES = {
+      battaglia: { name: "Battaglia Navale", maxPlayers: "2 Giocatori (1v1)" },
+      dama: { name: "Dama Tradizionale", maxPlayers: "2 Giocatori (1v1)" },
+      ncc: { name: "Nome Cose Città Animale Mestiere Frutta", maxPlayers: "2 a 5 Giocatori" },
+      briscola: { name: "Briscola Napoletana", maxPlayers: "2 o 4 Giocatori" },
+      scopa: { name: "Scopa Napoletana", maxPlayers: "2 Giocatori (1v1)" },
+      impiccato: { name: "Impiccato Segreto", maxPlayers: "2 a 5 Giocatori" },
+      tris: { name: "Tris Classico", maxPlayers: "2 Giocatori (1v1)" }
+    };
+
+    let currentGame = 'battaglia';
+
+    function switchGame(gameKey) {
+      currentGame = gameKey;
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      event.target.classList.add('active');
+      document.getElementById('ruleLimitTag').textContent = `Capacità: ${GAME_RULES[gameKey].maxPlayers}`;
+      resetCurrentGame();
+    }
+
+    function resetCurrentGame() {
+      hideResultBanner();
+      if(nccTimerInterval) clearInterval(nccTimerInterval);
+      const container = document.getElementById('gameContainer');
+      const title = document.getElementById('gameTitle');
+      container.innerHTML = '';
+      title.textContent = GAME_RULES[currentGame].name;
+
+      if (currentGame === 'battaglia') setupNavalStep1();
+      else if (currentGame === 'dama') initDamaEngine();
+      else if (currentGame === 'ncc') initNCC();
+      else if (currentGame === 'briscola') initBriscolaEngine();
+      else if (currentGame === 'scopa') initScopaEngine();
+      else if (currentGame === 'impiccato') initImpiccato();
+      else if (currentGame === 'tris') initTris();
+    }
+
+    // --- PEERJS MULTIPLAYER ---
+    let peer = null, peerConn = null, myPeerId = "";
+    function initPeer() {
+      const randomId = "gioco26-" + Math.floor(1000 + Math.random() * 9000);
+      peer = new Peer(randomId);
+      peer.on('open', (id) => { myPeerId = id; document.getElementById('myPeerId').textContent = id; });
+      peer.on('connection', (conn) => { peerConn = conn; setupPeerListeners(); });
+    }
+    function connectToPeer() {
+      const targetId = document.getElementById('targetPeerInput').value.trim();
+      if (targetId) peerConn = peer.connect(targetId);
+      setupPeerListeners();
+    }
+    function setupPeerListeners() {
+      if(!peerConn) return;
+      peerConn.on('open', () => addChatMessage("Sistema", "Connessione gioco26 Stabilita!"));
+      peerConn.on('data', (data) => {
+        if(data.type==='chat') addChatMessage(data.sender, data.text);
+        else if(data.type==='naval_config') applyRemoteNavalConfig(data);
+        else if(data.type==='ncc_spin') receiveRemoteSpin(data.letter);
+        else if(data.type==='ncc_stop') receiveRemoteNccStop();
+        else if(data.type==='ncc_submit') receiveRemoteNccSubmit(data.words);
+      });
+    }
+    function handleModeChange() {
+      const mode = document.getElementById('opponentMode').value;
+      if(mode === 'bot' && opponentName === "Giocatore 2") {
+        document.getElementById('opponentNameInput').value = "Bot";
+        opponentName = "Bot";
+      } else if (mode === 'online' && opponentName === "Bot") {
+        document.getElementById('opponentNameInput').value = "Giocatore 2";
+        opponentName = "Giocatore 2";
+      }
+      renderScoreboard();
+      resetCurrentGame(); 
+    }
+    initPeer();
+
+    // --- CHAT & RADIO ---
+    function addChatMessage(user, text) {
+      const logs = document.getElementById('chatLogs');
+      const msg = document.createElement('div');
+      msg.className = 'chat-msg';
+      msg.innerHTML = `<span style="color:var(--accent); font-weight:bold;">${user}:</span> ${text}`;
+      logs.appendChild(msg); logs.scrollTop = logs.scrollHeight;
+    }
+    function sendChatMessage() {
+      const input = document.getElementById('chatInput');
+      if(!input.value.trim()) return;
+      addChatMessage(playerName, input.value.trim());
+      if(peerConn && peerConn.open) peerConn.send({type:'chat', sender:playerName, text:input.value.trim()});
+      input.value = '';
+    }
+
+    const stations = [
+      { name: "RAI Radio 1", url: "https://icestreaming.rai.it/1.mp3" },
+      { name: "RAI Radio 2", url: "https://icestreaming.rai.it/2.mp3" },
+      { name: "RAI Radio 3", url: "https://icestreaming.rai.it/3.mp3" },
+      { name: "RAI Classica", url: "https://icestreaming.rai.it/5.mp3" },
+      { name: "RAI Isoradio", url: "https://icestreaming.rai.it/6.mp3" },
+      { name: "RSI Rete Uno (CH)", url: "https://stream.srg-ssr.ch/m/reteuno/mp3_128" },
+      { name: "RSI Rete Tre (CH)", url: "https://stream.srg-ssr.ch/m/retetre/mp3_128" },
+      { name: "Radio Popolare", url: "https://stream.radiopopolare.it/popolare.mp3" }
+    ];
+
+    function renderStations() {
+      const list = document.getElementById('radioList');
+      list.innerHTML = '';
+      stations.forEach((st) => {
+        const item = document.createElement('div');
+        item.className = 'radio-card';
+        item.onclick = () => { 
+          document.getElementById('stName').textContent = st.name; 
+          document.getElementById('audioPlayer').src = st.url; 
+          document.getElementById('audioPlayer').play(); 
+        };
+        item.innerHTML = `<span>${st.name}</span><span style="color:var(--green)">▶</span>`;
+        list.appendChild(item);
+      });
+    }
+    renderStations();
+
+
+    // ==========================================
+    // 1. BATTAGLIA NAVALE ADATTIVA
+    // ==========================================
+    let navalPlayerGrid = [], navalBotGrid = [];
+    let playerShipsList = [], botShipsList = [];
+    let navalSize = 10;
+    let shipsToPlace = [];
+    let currentShipIdx = 0;
+    let placementDir = 'H';
+    let totalShipTiles = 0;
+    let pHits = 0, bHits = 0;
+    let navalPhase = 'setup';
+
+    function setupNavalStep1() {
+      navalPhase = 'setup';
+      document.getElementById('statusMsg').textContent = "Passo 1: Decidi le navi. La griglia si adatterà automaticamente per coprire il 30%.";
+      document.getElementById('gameContainer').innerHTML = `
+        <div style="display:flex; flex-direction:column; gap:0.4rem; background:#0f172a; padding:0.6rem 1rem; border-radius:8px; align-items:center; width:95%; max-width:360px; border:1px solid var(--border);">
+          <div style="font-size:0.75rem; font-weight:bold; color:var(--accent); margin-bottom:0.2rem;">Configurazione Flotta Sincronizzata</div>
+          <div style="display:flex; justify-content:space-between; width:100%; align-items:center; font-size:0.75rem;">
+            <label>Navi da 1 casella (🚤):</label>
+            <input type="number" id="n1" value="4" min="0" max="10" class="player-input" style="width:50px; text-align:center;" oninput="updateNavalPreview()">
+          </div>
+          <div style="display:flex; justify-content:space-between; width:100%; align-items:center; font-size:0.75rem;">
+            <label>Navi da 2 caselle (⛵):</label>
+            <input type="number" id="n2" value="4" min="0" max="10" class="player-input" style="width:50px; text-align:center;" oninput="updateNavalPreview()">
+          </div>
+          <div style="display:flex; justify-content:space-between; width:100%; align-items:center; font-size:0.75rem;">
+            <label>Navi da 3 caselle (🚢):</label>
+            <input type="number" id="n3" value="3" min="0" max="8" class="player-input" style="width:50px; text-align:center;" oninput="updateNavalPreview()">
+          </div>
+          <div style="display:flex; justify-content:space-between; width:100%; align-items:center; font-size:0.75rem;">
+            <label>Navi da 4 caselle (Battleship ⚓):</label>
+            <input type="number" id="n4" value="2" min="0" max="5" class="player-input" style="width:50px; text-align:center;" oninput="updateNavalPreview()">
+          </div>
+          
+          <div id="navalPreviewBox" style="background:#1e293b; width:100%; padding:0.4rem; border-radius:6px; font-size:0.7rem; color:var(--text-muted); text-align:center; border:1px solid var(--border);">
+            Calcolo schema in corso...
+          </div>
+          <button class="btn btn-success" style="width:100%; margin-top:0.3rem;" onclick="confirmNavalConfig()">Conferma Navi per Tutti i Giocatori ➡️</button>
+        </div>
+      `;
+      updateNavalPreview();
+    }
+
+    function updateNavalPreview() {
+      const s1 = parseInt(document.getElementById('n1')?.value) || 0;
+      const s2 = parseInt(document.getElementById('n2')?.value) || 0;
+      const s3 = parseInt(document.getElementById('n3')?.value) || 0;
+      const s4 = parseInt(document.getElementById('n4')?.value) || 0;
+
+      const totalTiles = (s1 * 1) + (s2 * 2) + (s3 * 3) + (s4 * 4);
+      let calculatedGridDim = Math.max(6, Math.round(Math.sqrt(totalTiles / 0.30)));
+      let totalSquares = calculatedGridDim * calculatedGridDim;
+      let coverage = totalSquares > 0 ? ((totalTiles / totalSquares) * 100).toFixed(1) : 0;
+
+      const box = document.getElementById('navalPreviewBox');
+      if (box) {
+        box.innerHTML = `
+          📌 <b>Navi Totali:</b> ${s1+s2+s3+s4} (${totalTiles} posti nave)<br>
+          📐 <b>Schema Griglia:</b> ${calculatedGridDim}x${calculatedGridDim} (${totalSquares} quadrati)<br>
+          🎯 <b>Copertura Navi:</b> ${coverage}% (~30%)
+        `;
+      }
+    }
+
+    function confirmNavalConfig() {
+      const s1 = parseInt(document.getElementById('n1').value) || 0;
+      const s2 = parseInt(document.getElementById('n2').value) || 0;
+      const s3 = parseInt(document.getElementById('n3').value) || 0;
+      const s4 = parseInt(document.getElementById('n4').value) || 0;
+
+      totalShipTiles = (s1 * 1) + (s2 * 2) + (s3 * 3) + (s4 * 4);
+
+      if (totalShipTiles === 0) {
+        alert("Scegli almeno una nave!");
+        return;
+      }
+
+      shipsToPlace = [];
+      for (let i = 0; i < s4; i++) shipsToPlace.push(4);
+      for (let i = 0; i < s3; i++) shipsToPlace.push(3);
+      for (let i = 0; i < s2; i++) shipsToPlace.push(2);
+      for (let i = 0; i < s1; i++) shipsToPlace.push(1);
+
+      navalSize = Math.max(6, Math.round(Math.sqrt(totalShipTiles / 0.30)));
+      
+      let calcCellPx = Math.max(16, Math.floor(220 / navalSize));
+      document.documentElement.style.setProperty('--cell-size', `${calcCellPx}px`);
+
+      if (document.getElementById('opponentMode').value === 'online' && peerConn && peerConn.open) {
+        peerConn.send({
+          type: 'naval_config',
+          shipsToPlace: shipsToPlace,
+          navalSize: navalSize,
+          totalShipTiles: totalShipTiles
+        });
+      }
+
+      startNavalPlacementPhase();
+    }
+
+    function applyRemoteNavalConfig(data) {
+      shipsToPlace = data.shipsToPlace;
+      navalSize = data.navalSize;
+      totalShipTiles = data.totalShipTiles;
+      
+      let calcCellPx = Math.max(16, Math.floor(220 / navalSize));
+      document.documentElement.style.setProperty('--cell-size', `${calcCellPx}px`);
+
+      if (currentGame === 'battaglia') {
+        alert(`🔔 Flotta sincronizzata! Schema a ${navalSize}x${navalSize} (${data.totalShipTiles} posti nave, 30%).`);
+        startNavalPlacementPhase();
+      }
+    }
+
+    function startNavalPlacementPhase() {
+      currentShipIdx = 0;
+      placementDir = 'H';
+      navalPlayerGrid = Array(navalSize * navalSize).fill(0);
+      navalBotGrid = Array(navalSize * navalSize).fill(0);
+      playerShipsList = [];
+      botShipsList = [];
+
+      navalPhase = 'placing';
+      renderNavalPlacement();
+    }
+
+    function togglePlacementDir() {
+      placementDir = placementDir === 'H' ? 'V' : 'H';
+      renderNavalPlacement();
+    }
+
+    function renderNavalPlacement() {
+      const currentLen = shipsToPlace[currentShipIdx];
+      document.getElementById('statusMsg').textContent = `Posiziona Nave (${currentShipIdx + 1}/${shipsToPlace.length}) - Lungh: ${currentLen} [${placementDir === 'H' ? 'Orizzontale ➡️' : 'Verticale ⬇️'}]`;
+
+      let gridHtml = '';
+      for (let i = 0; i < navalSize * navalSize; i++) {
+        const isShip = navalPlayerGrid[i] > 0;
+        gridHtml += `<div class="naval-cell ${isShip ? 'ship' : ''}" onclick="placePlayerShip(${i})">${isShip ? '🚢' : ''}</div>`;
+      }
+
+      document.getElementById('gameContainer').innerHTML = `
+        <div style="display:flex; flex-direction:column; align-items:center; gap:0.3rem;">
+          <button class="btn" onclick="togglePlacementDir()">🔄 Orientamento: ${placementDir === 'H' ? 'Orizzontale' : 'Verticale'}</button>
+          <div class="naval-board" style="grid-template-columns: repeat(${navalSize}, var(--cell-size));">
+            ${gridHtml}
+          </div>
+        </div>
+      `;
+    }
+
+    function canPlaceShip(grid, size, r, c, len, dir) {
+      for (let k = 0; k < len; k++) {
+        let nr = r + (dir === 'V' ? k : 0);
+        let nc = c + (dir === 'H' ? k : 0);
+        if (nr >= size || nc >= size) return false;
+        if (grid[nr * size + nc] !== 0) return false;
+      }
+      return true;
+    }
+
+    function placePlayerShip(idx) {
+      let r = Math.floor(idx / navalSize);
+      let c = idx % navalSize;
+      let len = shipsToPlace[currentShipIdx];
+
+      if (!canPlaceShip(navalPlayerGrid, navalSize, r, c, len, placementDir)) {
+        document.getElementById('statusMsg').textContent = "⚠️ Posizione non valida!";
+        return;
+      }
+
+      let shipObj = { id: playerShipsList.length + 1, len: len, cells: [], hitCount: 0 };
+
+      for (let k = 0; k < len; k++) {
+        let nr = r + (placementDir === 'V' ? k : 0);
+        let nc = c + (placementDir === 'H' ? k : 0);
+        let cellIdx = nr * navalSize + nc;
+        navalPlayerGrid[cellIdx] = shipObj.id;
+        shipObj.cells.push(cellIdx);
+      }
+      playerShipsList.push(shipObj);
+
+      currentShipIdx++;
+      if (currentShipIdx >= shipsToPlace.length) {
+        generateBotShips();
+        startNavalBattle();
+      } else {
+        renderNavalPlacement();
+      }
+    }
+
+    function generateBotShips() {
+      shipsToPlace.forEach(len => {
+        let placed = false;
+        let attempts = 0;
+        while (!placed && attempts < 500) {
+          attempts++;
+          let dir = Math.random() < 0.5 ? 'H' : 'V';
+          let r = Math.floor(Math.random() * navalSize);
+          let c = Math.floor(Math.random() * navalSize);
+          if (canPlaceShip(navalBotGrid, navalSize, r, c, len, dir)) {
+            let shipObj = { id: botShipsList.length + 1, len: len, cells: [], hitCount: 0 };
+            for (let k = 0; k < len; k++) {
+              let nr = r + (dir === 'V' ? k : 0);
+              let nc = c + (dir === 'H' ? k : 0);
+              let cellIdx = nr * navalSize + nc;
+              navalBotGrid[cellIdx] = shipObj.id;
+              shipObj.cells.push(cellIdx);
+            }
+            botShipsList.push(shipObj);
+            placed = true;
+          }
+        }
+      });
+    }
+
+    function startNavalBattle() {
+      navalPhase = 'battle';
+      pHits = 0;
+      bHits = 0;
+      document.getElementById('statusMsg').textContent = `Passo 3: Battaglia Avviata! Clicca sulla griglia nemica.`;
+      renderNavalBattle();
+    }
+
+    function renderNavalBattle() {
+      let pGridHtml = '', bGridHtml = '';
+      for (let i = 0; i < navalSize * navalSize; i++) {
+        let pCell = navalPlayerGrid[i];
+        let pState = pCell === -1 ? 'hit' : pCell === -2 ? 'miss' : pCell > 0 ? 'ship' : '';
+        let pChar = pCell === -1 ? '💥' : pCell === -2 ? '🌊' : pCell > 0 ? '🚢' : '';
+        pGridHtml += `<div class="naval-cell ${pState}">${pChar}</div>`;
+
+        let bCell = navalBotGrid[i];
+        let bState = bCell === -1 ? 'hit' : bCell === -2 ? 'miss' : '';
+        let bChar = bCell === -1 ? '💥' : bCell === -2 ? '🌊' : '';
+        bGridHtml += `<div class="naval-cell ${bState}" onclick="shootNaval(${i}, this)">${bChar}</div>`;
+      }
+
+      const totalShips = playerShipsList.length;
+      const playerSunkShips = playerShipsList.filter(s => s.hitCount === s.len).length;
+      const playerRemainingShips = totalShips - playerSunkShips;
+
+      const botSunkShips = botShipsList.filter(s => s.hitCount === s.len).length;
+      const botRemainingShips = totalShips - botSunkShips;
+
+      document.getElementById('gameContainer').innerHTML = `
+        <div class="naval-stats-bar">
+          <div class="naval-stat-box">
+            <b>${playerName}</b><br>
+            Navi Presenti: <span>${playerRemainingShips}/${totalShips}</span><br>
+            Navi Abbattute Subite: <span style="color:var(--red); font-weight:bold;">${playerSunkShips}</span>
+          </div>
+          <div class="naval-stat-box">
+            <b>${opponentName}</b><br>
+            Navi Presenti: <span>${botRemainingShips}/${totalShips}</span><br>
+            Navi Abbattute da Te: <span style="color:var(--green); font-weight:bold;">${botSunkShips}</span>
+          </div>
+        </div>
+        <div class="naval-boards-wrapper">
+          <div class="board-container">
+            <div class="board-label">${playerName}</div>
+            <div class="naval-board" style="grid-template-columns: repeat(${navalSize}, var(--cell-size));">
+              ${pGridHtml}
+            </div>
+          </div>
+          <div class="board-container">
+            <div class="board-label">${opponentName}</div>
+            <div class="naval-board" style="grid-template-columns: repeat(${navalSize}, var(--cell-size));">
+              ${bGridHtml}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function shootNaval(idx, el) {
+      if (navalPhase !== 'battle') return;
+      if (navalBotGrid[idx] === -1 || navalBotGrid[idx] === -2) return;
+
+      if (navalBotGrid[idx] > 0) {
+        let hitShipId = navalBotGrid[idx];
+        let ship = botShipsList.find(s => s.id === hitShipId);
+        if (ship) ship.hitCount++;
+        
+        navalBotGrid[idx] = -1;
+        pHits++;
+        
+        if (pHits >= totalShipTiles) {
+          renderNavalBattle();
+          showGameResult(true, playerName, opponentName);
+          addWin('battaglia');
+          navalPhase = 'over';
+          return;
+        }
+      } else {
+        navalBotGrid[idx] = -2;
+      }
+
+      botShootNaval();
+      if(navalPhase === 'battle') renderNavalBattle();
+    }
+
+    function botShootNaval() {
+      let available = [];
+      for (let i = 0; i < navalSize * navalSize; i++) {
+        if (navalPlayerGrid[i] >= 0) available.push(i);
+      }
+      if (available.length === 0) return;
+      let target = available[Math.floor(Math.random() * available.length)];
+      
+      if (navalPlayerGrid[target] > 0) {
+        let hitShipId = navalPlayerGrid[target];
+        let ship = playerShipsList.find(s => s.id === hitShipId);
+        if (ship) ship.hitCount++;
+
+        navalPlayerGrid[target] = -1;
+        bHits++;
+        
+        if (bHits >= totalShipTiles) {
+          renderNavalBattle();
+          showGameResult(false, opponentName, playerName);
+          addOpponentWin('battaglia');
+          navalPhase = 'over';
+        }
+      } else {
+        navalPlayerGrid[target] = -2;
+      }
+    }
+
+
+    // ==========================================
+    // 2. GIOCO DELLA DAMA ITALIANA TRADIZIONALE
+    // ==========================================
+    let damaBoard = [];
+    let selectedDamaCell = null;
+    let damaSoffioEnabled = false;
+    let damaActiveMultiJump = null;
+
+    function toggleDamaSoffio() {
+      damaSoffioEnabled = !damaSoffioEnabled;
+      renderDamaBoard();
+    }
+
+    function initDamaEngine() {
+      damaBoard = Array(64).fill(null);
+      selectedDamaCell = null;
+      damaActiveMultiJump = null;
+      
+      for(let r=0; r<8; r++) {
+        for(let c=0; c<8; c++) {
+          if((r+c)%2 === 1) {
+            if(r < 3) damaBoard[r*8+c] = { color: 'black', isKing: false };
+            else if(r > 4) damaBoard[r*8+c] = { color: 'white', isKing: false };
+          }
+        }
+      }
+      document.getElementById('statusMsg').textContent = `Dama Italiana: Muove ${playerName} (Bianchi). Presa obbligatoria.`;
+      renderDamaBoard();
+    }
+
+    function inDamaBounds(r, c) {
+      return r >= 0 && r < 8 && c >= 0 && c < 8;
+    }
+
+    function getPieceCapturesFrom(board, idx, currentPath = []) {
+      const piece = board[idx];
+      if (!piece) return [];
+      
+      const r = Math.floor(idx / 8);
+      const c = idx % 8;
+      const isWhite = piece.color === 'white';
+      
+      let dirs = piece.isKing ? [[-1,-1], [-1,1], [1,-1], [1,1]] : (isWhite ? [[-1,-1], [-1,1]] : [[1,-1], [1,1]]);
+      let paths = [];
+      
+      for (let [dr, dc] of dirs) {
+        let r1 = r + dr, c1 = c + dc;
+        let r2 = r + 2*dr, c2 = c + 2*dc;
+        
+        if (inDamaBounds(r2, c2)) {
+          let idx1 = r1 * 8 + c1;
+          let idx2 = r2 * 8 + c2;
+          let target = board[idx1];
+          let landing = board[idx2];
+          
+          if (target && target.color !== piece.color && landing === null) {
+            if (!piece.isKing && target.isKing) continue;
+            
+            let nextBoard = [...board];
+            nextBoard[idx] = null;
+            nextBoard[idx1] = null;
+            
+            let promoted = false;
+            let movedPiece = { ...piece };
+            if (!movedPiece.isKing && ((piece.color === 'white' && r2 === 0) || (piece.color === 'black' && r2 === 7))) {
+              movedPiece.isKing = true;
+              promoted = true;
+            }
+            nextBoard[idx2] = movedPiece;
+            
+            let stepInfo = { from: idx, to: idx2, capturedIdx: idx1, capturedIsKing: target.isKing };
+            let newPath = [...currentPath, stepInfo];
+            let furtherCaptures = promoted ? [] : getPieceCapturesFrom(nextBoard, idx2, newPath);
+            if (furtherCaptures.length > 0) paths.push(...furtherCaptures);
+            else paths.push(newPath);
+          }
+        }
+      }
+      return paths;
+    }
+
+    function evaluateCapturePath(path, startPiece) {
+      let totalCaptured = path.length;
+      let usesKing = startPiece.isKing ? 1 : 0;
+      let capturedKingsCount = path.filter(s => s.capturedIsKing).length;
+      let firstCapturedIsKing = (path.length > 0 && path[0].capturedIsKing) ? 1 : 0;
+      return { path, totalCaptured, usesKing, capturedKingsCount, firstCapturedIsKing };
+    }
+
+    function getBestCapturePathsForColor(board, color) {
+      let allEvaluated = [];
+      for (let i = 0; i < 64; i++) {
+        let p = board[i];
+        if (p && p.color === color) {
+          let paths = getPieceCapturesFrom(board, i);
+          for (let path of paths) {
+            allEvaluated.push(evaluateCapturePath(path, p));
+          }
+        }
+      }
+      if (allEvaluated.length === 0) return [];
+      
+      allEvaluated.sort((a, b) => {
+        if (b.totalCaptured !== a.totalCaptured) return b.totalCaptured - a.totalCaptured;
+        if (b.usesKing !== a.usesKing) return b.usesKing - a.usesKing;
+        if (b.capturedKingsCount !== a.capturedKingsCount) return b.capturedKingsCount - a.capturedKingsCount;
+        return b.firstCapturedIsKing - a.firstCapturedIsKing;
+      });
+      
+      let best = allEvaluated[0];
+      return allEvaluated
+        .filter(e => 
+          e.totalCaptured === best.totalCaptured &&
+          e.usesKing === best.usesKing &&
+          e.capturedKingsCount === best.capturedKingsCount &&
+          e.firstCapturedIsKing === best.firstCapturedIsKing
+        )
+        .map(e => e.path);
+    }
+
+    function getSimpleMovesForPiece(board, idx) {
+      const piece = board[idx];
+      if (!piece) return [];
+      
+      const r = Math.floor(idx / 8);
+      const c = idx % 8;
+      const isWhite = piece.color === 'white';
+      
+      let dirs = piece.isKing ? [[-1,-1], [-1,1], [1,-1], [1,1]] : (isWhite ? [[-1,-1], [-1,1]] : [[1,-1], [1,1]]);
+      let moves = [];
+      for (let [dr, dc] of dirs) {
+        let nr = r + dr, nc = c + dc;
+        if (inDamaBounds(nr, nc)) {
+          let nIdx = nr * 8 + nc;
+          if (board[nIdx] === null) moves.push(nIdx);
+        }
+      }
+      return moves;
+    }
+
+    function renderDamaBoard() {
+      const container = document.getElementById('gameContainer');
+      let bestCaptures = getBestCapturePathsForColor(damaBoard, 'white');
+      let mustCapturePieces = new Set(bestCaptures.map(p => p[0].from));
+      
+      let html = `
+        <div style="margin-bottom:0.3rem; display:flex; gap:0.5rem; align-items:center; font-size:0.75rem;">
+          <button class="btn" style="padding:0.2rem 0.5rem; font-size:0.68rem; background:${damaSoffioEnabled ? 'var(--yellow)' : '#334155'}; color:${damaSoffioEnabled ? '#000' : '#fff'};" onclick="toggleDamaSoffio()">
+            💨 Soffio: ${damaSoffioEnabled ? 'ATTIVATO (Tradizionale)' : 'DISATTIVATO (Ufficiale FID)'}
+          </button>
+          <span style="color:var(--text-muted); font-size:0.65rem;">
+            ${bestCaptures.length > 0 ? '⚠️ Cattura obbligatoria!' : 'Nessuna presa disponibile'}
+          </span>
+        </div>
+        <div class="dama-board">
+      `;
+      
+      for(let i=0; i<64; i++) {
+        let r = Math.floor(i/8), c = i%8;
+        let isDark = (r+c)%2 === 1;
+        let piece = damaBoard[i];
+        
+        let isSelected = selectedDamaCell === i;
+        let isMustCapture = mustCapturePieces.has(i);
+        
+        let cellStyle = "";
+        if (isSelected) cellStyle = "outline: 2px solid #22c55e; outline-offset: -2px;";
+        else if (isMustCapture) cellStyle = "outline: 2px dashed #ef4444; outline-offset: -2px;";
+        
+        html += `<div class="dama-cell ${isDark?'dark':'light'}" style="${cellStyle}" onclick="handleDamaClick(${i})">`;
+        if(piece) {
+          html += `<div class="dama-piece ${piece.color}">${piece.isKing?'👑':'●'}</div>`;
+        }
+        html += `</div>`;
+      }
+      html += '</div>';
+      container.innerHTML = html;
+    }
+
+    function handleDamaClick(idx) {
+      let piece = damaBoard[idx];
+      let bestCaptures = getBestCapturePathsForColor(damaBoard, 'white');
+      
+      if (damaActiveMultiJump) {
+        let validNextSteps = damaActiveMultiJump.remainingPaths.filter(p => p[0].to === idx);
+        if (validNextSteps.length > 0) {
+          executePlayerCaptureStep(validNextSteps, idx);
+        } else {
+          document.getElementById('statusMsg').textContent = "⚠️ Completa la catena di cattura obbligatoria!";
+        }
+        return;
+      }
+      
+      if (selectedDamaCell === null) {
+        if (piece && piece.color === 'white') {
+          selectedDamaCell = idx;
+          renderDamaBoard();
+        }
+      } else {
+        if (idx === selectedDamaCell) {
+          selectedDamaCell = null;
+          renderDamaBoard();
+          return;
+        }
+        
+        let from = selectedDamaCell;
+        if (piece && piece.color === 'white') {
+          selectedDamaCell = idx;
+          renderDamaBoard();
+          return;
+        }
+        
+        if (bestCaptures.length > 0) {
+          let pathsFromSelected = bestCaptures.filter(p => p[0].from === from);
+          if (pathsFromSelected.length === 0) {
+            if (damaSoffioEnabled) {
+              alert(`💨 SOFFIO! La pedina in casella non ha effettuato la presa obbligatoria ed è stata soffiata via!`);
+              damaBoard[from] = null;
+              selectedDamaCell = null;
+              renderDamaBoard();
+              setTimeout(botDamaMove, 600);
+              return;
+            } else {
+              document.getElementById('statusMsg').textContent = "⚠️ Presa obbligatoria secondo le regole della Dama Italiana!";
+              selectedDamaCell = null;
+              renderDamaBoard();
+              return;
+            }
+          }
+          
+          let matchingPaths = pathsFromSelected.filter(p => p[0].to === idx);
+          if (matchingPaths.length > 0) {
+            executePlayerCaptureStep(matchingPaths, idx);
+          } else {
+            document.getElementById('statusMsg').textContent = "⚠️ Mossa di presa non valida o non prioritaria!";
+            selectedDamaCell = null;
+            renderDamaBoard();
+          }
+          return;
+        }
+        
+        let simpleMoves = getSimpleMovesForPiece(damaBoard, from);
+        if (simpleMoves.includes(idx)) {
+          damaBoard[idx] = damaBoard[from];
+          damaBoard[from] = null;
+          
+          let rTo = Math.floor(idx / 8);
+          if (rTo === 0 && !damaBoard[idx].isKing) {
+            damaBoard[idx].isKing = true;
+            document.getElementById('statusMsg').textContent = `👑 Promozione! ${playerName} ha fatto DAMA!`;
+          }
+          
+          selectedDamaCell = null;
+          renderDamaBoard();
+          
+          if (checkDamaGameOver()) return;
+          setTimeout(botDamaMove, 500);
+        } else {
+          selectedDamaCell = null;
+          renderDamaBoard();
+        }
+      }
+    }
+
+    function executePlayerCaptureStep(matchingPaths, targetIdx) {
+      let step = matchingPaths[0][0];
+      let from = step.from;
+      
+      damaBoard[targetIdx] = damaBoard[from];
+      damaBoard[from] = null;
+      damaBoard[step.capturedIdx] = null;
+      
+      let rTo = Math.floor(targetIdx / 8);
+      let promoted = false;
+      if (rTo === 0 && !damaBoard[targetIdx].isKing) {
+        damaBoard[targetIdx].isKing = true;
+        promoted = true;
+      }
+      
+      let remainingPaths = matchingPaths.map(p => p.slice(1)).filter(p => p.length > 0);
+      if (remainingPaths.length > 0 && !promoted) {
+        damaActiveMultiJump = { pieceIdx: targetIdx, remainingPaths };
+        selectedDamaCell = targetIdx;
+        document.getElementById('statusMsg').textContent = "⚡ Catena di presa in corso! Clicca sulla casella successiva.";
+        renderDamaBoard();
+      } else {
+        damaActiveMultiJump = null;
+        selectedDamaCell = null;
+        if (promoted) document.getElementById('statusMsg').textContent = `👑 Promozione! ${playerName} ha fatto DAMA!`;
+        renderDamaBoard();
+        
+        if (checkDamaGameOver()) return;
+        setTimeout(botDamaMove, 600);
+      }
+    }
+
+    function botDamaMove() {
+      if (checkDamaGameOver()) return;
+      
+      let bestCaptures = getBestCapturePathsForColor(damaBoard, 'black');
+      if (bestCaptures.length > 0) {
+        let path = bestCaptures[Math.floor(Math.random() * bestCaptures.length)];
+        for (let step of path) {
+          damaBoard[step.to] = damaBoard[step.from];
+          damaBoard[step.from] = null;
+          damaBoard[step.capturedIdx] = null;
+          
+          let rTo = Math.floor(step.to / 8);
+          if (rTo === 7 && !damaBoard[step.to].isKing) damaBoard[step.to].isKing = true;
+        }
+        document.getElementById('statusMsg').textContent = `🤖 ${opponentName} ha effettuato la presa obbligatoria!`;
+      } else {
+        let blackIndices = [];
+        for (let i = 0; i < 64; i++) {
+          if (damaBoard[i] && damaBoard[i].color === 'black') blackIndices.push(i);
+        }
+        
+        let possibleSimple = [];
+        for (let from of blackIndices) {
+          let moves = getSimpleMovesForPiece(damaBoard, from);
+          for (let to of moves) possibleSimple.push({ from, to });
+        }
+        
+        if (possibleSimple.length === 0) {
+          showGameResult(true, playerName, opponentName);
+          addWin('dama');
+          return;
+        }
+        
+        let choice = possibleSimple[Math.floor(Math.random() * possibleSimple.length)];
+        damaBoard[choice.to] = damaBoard[choice.from];
+        damaBoard[choice.from] = null;
+        
+        let rTo = Math.floor(choice.to / 8);
+        if (rTo === 7 && !damaBoard[choice.to].isKing) damaBoard[choice.to].isKing = true;
+        document.getElementById('statusMsg').textContent = `Tocca a ${playerName} (Bianchi).`;
+      }
+      
+      renderDamaBoard();
+      checkDamaGameOver();
+    }
+
+    function checkDamaGameOver() {
+      let whiteCount = 0, blackCount = 0;
+      for (let i = 0; i < 64; i++) {
+        if (damaBoard[i]) {
+          if (damaBoard[i].color === 'white') whiteCount++;
+          if (damaBoard[i].color === 'black') blackCount++;
+        }
+      }
+      
+      if (whiteCount === 0) {
+        showGameResult(false, opponentName, playerName);
+        addOpponentWin('dama');
+        return true;
+      }
+      if (blackCount === 0) {
+        showGameResult(true, playerName, opponentName);
+        addWin('dama');
+        return true;
+      }
+      
+      let whiteCaptures = getBestCapturePathsForColor(damaBoard, 'white');
+      if (whiteCaptures.length === 0) {
+        let hasSimple = false;
+        for (let i = 0; i < 64; i++) {
+          if (damaBoard[i] && damaBoard[i].color === 'white') {
+            if (getSimpleMovesForPiece(damaBoard, i).length > 0) {
+              hasSimple = true;
+              break;
+            }
+          }
+        }
+        if (!hasSimple) {
+          showGameResult(false, opponentName, playerName);
+          addOpponentWin('dama');
+          return true;
+        }
+      }
+      return false;
+    }
+
+
+    // ==========================================
+    // 3. NOME COSE CITTA ANIMALE MESTIERE FRUTTA (CON RUOTA, VOCABOLARIO E TIMING 30S)
+    // ==========================================
+    let nccCurrentLetter = '';
+    let nccSpinning = false;
+    let nccTimerInterval = null;
+    let nccTimeLeft = 30;
+    let nccRemoteWords = null;
+
+    // VOCABOLARIO UFFICIALE DI VERIFICA (DIZIONARIO ESTESO E TOLLERANTE A MAIUSCOLE/MINUSCOLE E COMUNI ITALIANI)
+    const nccDictionary = {
+      NOME: ["ALESSANDRO", "ALBERTO", "ANNA", "ALESSIA", "ANDREA", "ANTONIO", "AURORA", "BARBARA", "BEATRICE", "BRUNO", "CARLO", "CHIARA", "CHRISTIAN", "CLAUDIO", "CRISTINA", "DANIELA", "DAVIDE", "DIEGO", "ELENA", "ELISA", "ENRICO", "FEDERICA", "FRANCESCO", "FILIPPO", "GABRIELE", "GIADA", "GIORGIO", "GIULIA", "GIUSEPPE", "ILARIA", "ISABELLA", "JACOPO", "LAURA", "LUCA", "LORENZO", "MARCO", "MARIA", "MATTEO", "MICHELE", "NICOLO", "NOEMI", "PAOLO", "PIETRO", "RICCARDO", "ROBERTO", "SARA", "STEFANO", "TOMMASO", "VALENTINA", "VINCENZO", "WALKER", "YARA", "ZACCARIA"],
+      COSA: ["ARMADIO", "ANELLO", "ASTUCCIO", "BANCO", "BICCHIERI", "BOTTIGLIA", "CALCOLATRICE", "CAMICIA", "CHIAVE", "CUSCINO", "DIVANO", "DOCCIA", "ELICOTTERO", "EVIDENZIATORE", "FORCHETTA", "FORBICI", "GIACCA", "GIORNALE", "IMBUTO", "INTERRUTTORE", "LAMPADA", "LIBRO", "MATITA", "MARTELLO", "NEBULIZZATORE", "OROLOGIO", "OMBRELLO", "PETTINE", "PENNA", "QUADRANO", "QUADERNONE", "RADIO", "ROBOT", "SEDIA", "SPECCHIO", "TASTIERA", "TELEFONO", "TAVOLO", "UVA", "VASO", "VALIGIA", "ZAINO"],
+      CITTA: [
+        "AGRIGENTO", "ALESSANDRIA", "ANCONA", "AOSTA", "AREZZO", "AVELLINO", "ASTI", "ASCOLI PICENO", "ALGHERO", "ALBA", "ALTAMURA", "ASSISI", "ANZIO", "ARONA", "ACQUAPENDENTE", "ABBIATEGRASSO", "ACERRA", "AFRAGOLA", "ADRIA", "AGROPOLI", "ALCAMO",
+        "BARI", "BERGAMO", "BOLOGNA", "BOLZANO", "BRESCIA", "BRINDISI", "BIELLA", "BELLUNO", "BENEVENTO", "BUSTO ARSIZIO", "BATTIPAGLIA", "BAGHERIA", "BARLETTA", "BORDIGHERA", "BRESSANONE", "BASSANO DEL GRAPPA", "BELLAGIO",
+        "CAGLIARI", "CATANIA", "CATANZARO", "COMO", "CREMONA", "COSENZA", "CASERTA", "CUNEO", "CHIETI", "CESENA", "CIVITAVECCHIA", "CARPI", "CARRARA", "CASTELLAMMARE DI STABIA", "CREMA", "CORTINA D'AMPEZZO", "CAPRI", "CERVIA", "CESENATICO",
+        "DOMODOSSOLA", "DESENZANO DEL GARDA", "DESENZANO", "DOLO", "DIAMANTE", "DIANO MARINA", "DESIO", "DERUTA", "DUINO",
+        "ENNA", "EMPOLI", "ERCOLANO", "ERBA", "EBOLI", "ESTE", "ENVIE",
+        "FERRARA", "FIRENZE", "FOGGIA", "FORLI", "FROSINONE", "FERMO", "FAENZA", "FANO", "FORMIA", "FOLIGNO", "FRASCATI", "FABRIANO", "FIUMICINO", "FELTRE",
+        "GENOVA", "GORIZIA", "GROSSETO", "GAETA", "GALLIPOLI", "GRADARA", "GUBBIO", "GIUGLIANO", "GUIDONIA", "GRAVINA", "GIARRE",
+        "IMPERIA", "ISERNIA", "IGLESIAS", "IMOLA", "IVREA", "ISCHIA", "ITRI",
+        "L'AQUILA", "LECCE", "LIVORNO", "LUCCA", "LATINA", "LODI", "LA SPEZIA", "LAMEZIA TERME", "LEGNANO", "LISSONE", "LOVERE", "LUCERA", "LORETO",
+        "MILANO", "MODENA", "MONZA", "MANTOVA", "MATERA", "MESSINA", "MASSA", "MACERATA", "MARSALA", "MERANO", "MOLFETTA", "MARANO", "MODICA", "MONCALIERI", "MONTECATINI TERME", "MANFREDONIA",
+        "NAPOLI", "NOVARA", "NUORO", "NOTO", "NARNI", "NOCERA", "NETTUNO", "NOLA",
+        "ORISTANO", "OLBIA", "ORVIETO", "OSTUNI", "ORTISEI", "OSTIA", "ORBETELLO", "OSIMO", "ODERZO",
+        "PADOVA", "PALERMO", "PARMA", "PERUGIA", "PESCARA", "PISA", "POTENZA", "PIACENZA", "PAVIA", "PRATO", "PESARO", "PISTOIA", "PORDENONE", "POZZUOLI", "POMPEI", "PORTICI", "PISTICCI", "PIOMBINO",
+        "RAVENNA", "REGGIO CALABRIA", "REGGIO EMILIA", "RIETI", "RIMINI", "ROMA", "ROVIGO", "RAGUSA", "RAPALLO", "RIVA DEL GARDA", "RIVOLI", "RHO", "ROSETO DEGLI ABRUZZI",
+        "SALERNO", "SASSARI", "SIENA", "SIRACUSA", "SONDRIO", "SAVONA", "SANREMO", "SESTO SAN GIOVANNI", "SAN SEVERO", "SULMONA", "SENIGALLIA", "SORRENTO", "STRESA", "SPOLETO",
+        "TARANTO", "TORINO", "TRENTO", "TRIESTE", "TERAMO", "TERNI", "TREVISO", "TRAPANI", "TIVOLI", "TRANI", "TAORMINA", "TROPEA", "TERMOLI", "TODI", "TERRACINA",
+        "UDINE", "URBINO", "USTICA", "UGENTO",
+        "VENEZIA", "VERONA", "VICENZA", "VITERBO", "VARESE", "VERBANIA", "VERCELLI", "VIBO VALENTIA", "VIGEVANO", "VIESTE", "VENTIMIGLIA", "VIGNOLA", "VALDAGNO", "VOGHERA"
+      ],
+      ANIMALE: ["AQUILA", "ASINO", "APE", "BALENA", "BISCIA", "CANE", "GATTO", "CAVALLO", "CERVO", "CONIGLIO", "DELFINO", "ELEFANTE", "FALCO", "FENICOTTERO", "GIRAFFA", "GUFO", "IPPOPOTAMO", "IGUANA", "LEONE", "LUPO", "MUTO", "MAMMUT", "ORSO", "OCA", "PANDA", "PANTERA", "PINGUINO", "ROSPO", "RANA", "SQUALO", "SERPENTE", "TIGRE", "TORO", "UCCELLO", "VOLPE", "ZEBRA"],
+      MESTIERE: ["ARCHITETTO", "AVVOCATO", "ATTORE", "ASTRONAUTA", "BARBIERE", "BARTENDER", "CAMERIERE", "CUOCO", "CARABINIERE", "CHIRURGO", "DOTTORE", "DENTISTA", "ELETTRICISTA", "FALEGNAME", "FARMACISTA", "FORNAIO", "GIARDINIERE", "GIORNALISTA", "IDRAULICO", "INSEGNANTE", "INFORMATICO", "INFERMIERE", "LAVANDAIO", "MURATORE", "MAGISTRATO", "NOTAIO", "NEGOZIANTE", "OCULISTA", "OPERAIO", "PITTORE", "POLIZIOTTO", "PILOTA", "ROBOTICA", "SARTO", "SCRITTORE", "TASSISTA", "VETERINARIO", "ZOOLOGO"],
+      FRUTTA: ["ALBICOCCA", "ANANAS", "ARANCIA", "AVOCADO", "BANANA", "CILIEGIA", "CASTAGNA", "CLEMENTINA", "DATTERO", "FICO", "FRAGOLA", "GIUGGIOLA", "KIWI", "LIMONE", "LAMPONE", "MELA", "MELONE", "MORA", "MIRTILLO", "NESPOLA", "NOCE", "NOCCIOLA", "PESCA", "PERA", "POMPELMO", "PRUGNA", "RIBES", "SUSINA", "UVA"]
+    };
+
+    const nccAlphabet = ["A", "B", "C", "D", "E", "F", "G", "I", "L", "M", "N", "O", "P", "R", "S", "T", "U", "V"];
+
+    function initNCC() {
+      nccCurrentLetter = '';
+      nccSpinning = false;
+      nccRemoteWords = null;
+      if (nccTimerInterval) clearInterval(nccTimerInterval);
+
+      document.getElementById('statusMsg').textContent = "Premi 'GIRA LA RUOTA' per estrarre la lettera della partita!";
+
+      document.getElementById('gameContainer').innerHTML = `
+        <div class="ncc-container">
+          
+          <div style="display:flex; align-items:center; gap:1rem;">
+            <div class="wheel-container">
+              <div class="wheel-pointer"></div>
+              <canvas id="wheelCanvas" width="140" height="140"></canvas>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:0.3rem;">
+              <button id="spinBtn" class="btn btn-success" style="font-size:0.85rem; padding:0.4rem 0.8rem;" onclick="spinNccWheel()">🎡 GIRA LA RUOTA</button>
+              <div id="nccLetterDisplay" style="font-size:1.4rem; font-weight:900; color:#38bdf8; text-align:center;">Lettera: --</div>
+              <div id="nccTimerBox" class="timer-badge" style="display:none;">⏱️ <span id="nccTimerVal">30</span>s</div>
+            </div>
+          </div>
+
+          <div class="ncc-form-row">
+            <div class="ncc-field-box"><label>1. Nome</label><input type="text" id="field_NOME" class="ncc-field-input" disabled></div>
+            <div class="ncc-field-box"><label>2. Cosa</label><input type="text" id="field_COSA" class="ncc-field-input" disabled></div>
+            <div class="ncc-field-box"><label>3. Città</label><input type="text" id="field_CITTA" class="ncc-field-input" disabled></div>
+            <div class="ncc-field-box"><label>4. Animale</label><input type="text" id="field_ANIMALE" class="ncc-field-input" disabled></div>
+            <div class="ncc-field-box"><label>5. Mestiere</label><input type="text" id="field_MESTIERE" class="ncc-field-input" disabled></div>
+            <div class="ncc-field-box"><label>6. Frutta</label><input type="text" id="field_FRUTTA" class="ncc-field-input" disabled></div>
+          </div>
+
+          <button id="stopNccBtn" class="btn btn-stop" style="width:100%; font-size:0.85rem; padding:0.4rem; display:none;" onclick="triggerNccStop()">🛑 STOP! (HO FINITO)</button>
+
+          <div id="nccResultsArea" style="width:100%;"></div>
+        </div>
+      `;
+      drawWheel(0);
+    }
+
+    function drawWheel(angle) {
+      const canvas = document.getElementById('wheelCanvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const numSlices = nccAlphabet.length;
+      const sliceAngle = (2 * Math.PI) / numSlices;
+
+      ctx.clearRect(0, 0, 140, 140);
+      ctx.save();
+      ctx.translate(70, 70);
+      ctx.rotate(angle);
+
+      for (let i = 0; i < numSlices; i++) {
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.arc(0, 0, 70, i * sliceAngle, (i + 1) * sliceAngle);
+        ctx.closePath();
+        ctx.fillStyle = i % 2 === 0 ? '#6366f1' : '#334155';
+        ctx.fill();
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        ctx.save();
+        ctx.rotate(i * sliceAngle + sliceAngle / 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 11px system-ui';
+        ctx.textAlign = 'right';
+        ctx.fillText(nccAlphabet[i], 62, 4);
+        ctx.restore();
+      }
+      ctx.restore();
+    }
+
+    function spinNccWheel() {
+      if (nccSpinning) return;
+      nccSpinning = true;
+      document.getElementById('spinBtn').disabled = true;
+
+      const randomIdx = Math.floor(Math.random() * nccAlphabet.length);
+      nccCurrentLetter = nccAlphabet[randomIdx];
+
+      if (document.getElementById('opponentMode').value === 'online' && peerConn && peerConn.open) {
+        peerConn.send({ type: 'ncc_spin', letter: nccCurrentLetter });
+      }
+
+      executeWheelAnimation(randomIdx);
+    }
+
+    function receiveRemoteSpin(letter) {
+      nccCurrentLetter = letter;
+      const idx = nccAlphabet.indexOf(letter);
+      executeWheelAnimation(idx >= 0 ? idx : 0);
+    }
+
+    function executeWheelAnimation(targetIdx) {
+      let currentRotation = 0;
+      const totalSlices = nccAlphabet.length;
+      const sliceAngle = (2 * Math.PI) / totalSlices;
+      
+      const targetAngle = (3 * Math.PI / 2) - (targetIdx * sliceAngle + sliceAngle / 2);
+      const extraRounds = 5 * 2 * Math.PI;
+      const finalAngle = extraRounds + targetAngle;
+      
+      let startTime = null;
+      const duration = 2500;
+
+      function animate(timestamp) {
+        if (!startTime) startTime = timestamp;
+        let progress = (timestamp - startTime) / duration;
+        if (progress > 1) progress = 1;
+
+        let easeOut = 1 - Math.pow(1 - progress, 3);
+        let angle = easeOut * finalAngle;
+        drawWheel(angle);
+
+        if (progress < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          nccSpinning = false;
+          onWheelStopped();
+        }
+      }
+      requestAnimationFrame(animate);
+    }
+
+    function onWheelStopped() {
+      document.getElementById('nccLetterDisplay').textContent = `Lettera: [ ${nccCurrentLetter} ]`;
+      document.getElementById('statusMsg').textContent = `Lettera estratta: ${nccCurrentLetter}! Compila i campi e premi STOP!`;
+      
+      ['NOME', 'COSA', 'CITTA', 'ANIMALE', 'MESTIERE', 'FRUTTA'].forEach(id => {
+        const inp = document.getElementById(`field_${id}`);
+        inp.disabled = false;
+        inp.value = '';
+      });
+
+      document.getElementById('stopNccBtn').style.display = 'block';
+    }
+
+    function triggerNccStop() {
+      document.getElementById('stopNccBtn').style.display = 'none';
+      if (document.getElementById('opponentMode').value === 'online' && peerConn && peerConn.open) {
+        peerConn.send({ type: 'ncc_stop' });
+      }
+      startNccCountdown();
+    }
+
+    function receiveRemoteNccStop() {
+      document.getElementById('stopNccBtn').style.display = 'none';
+      startNccCountdown();
+    }
+
+    function startNccCountdown() {
+      if (nccTimerInterval) clearInterval(nccTimerInterval);
+      nccTimeLeft = 30;
+      document.getElementById('nccTimerBox').style.display = 'inline-flex';
+      document.getElementById('nccTimerVal').textContent = nccTimeLeft;
+      document.getElementById('statusMsg').textContent = `⚠️ COUNTDOWN ATTIVATO! Hai ${nccTimeLeft} secondi per completare!`;
+
+      playTickSound();
+      nccTimerInterval = setInterval(() => {
+        nccTimeLeft--;
+        document.getElementById('nccTimerVal').textContent = nccTimeLeft;
+        playTickSound();
+
+        if (nccTimeLeft <= 0) {
+          clearInterval(nccTimerInterval);
+          finishNccRound();
+        }
+      }, 1000);
+    }
+
+    function finishNccRound() {
+      ['NOME', 'COSA', 'CITTA', 'ANIMALE', 'MESTIERE', 'FRUTTA'].forEach(id => {
+        const inp = document.getElementById(`field_${id}`);
+        if(inp) inp.disabled = true;
+      });
+
+      const myWords = {
+        NOME: document.getElementById('field_NOME').value.trim(),
+        COSA: document.getElementById('field_COSA').value.trim(),
+        CITTA: document.getElementById('field_CITTA').value.trim(),
+        ANIMALE: document.getElementById('field_ANIMALE').value.trim(),
+        MESTIERE: document.getElementById('field_MESTIERE').value.trim(),
+        FRUTTA: document.getElementById('field_FRUTTA').value.trim()
+      };
+
+      const isOnline = document.getElementById('opponentMode').value === 'online';
+
+      if (isOnline) {
+        if (peerConn && peerConn.open) {
+          peerConn.send({ type: 'ncc_submit', words: myWords });
+        }
+        if (nccRemoteWords) {
+          evaluateNccMatch(myWords, nccRemoteWords);
+        } else {
+          document.getElementById('statusMsg').textContent = "In attesa delle risposte del secondo giocatore...";
+          window.myPendingNccWords = myWords;
+        }
+      } else {
+        const botWords = generateBotNccWords(nccCurrentLetter);
+        evaluateNccMatch(myWords, botWords);
+      }
+    }
+
+    function receiveRemoteNccSubmit(words) {
+      nccRemoteWords = words;
+      if (window.myPendingNccWords) {
+        evaluateNccMatch(window.myPendingNccWords, nccRemoteWords);
+        window.myPendingNccWords = null;
+      }
+    }
+
+    function generateBotNccWords(letter) {
+      const cleanLetter = letter ? letter.trim().toUpperCase() : '';
+      const getWord = (cat) => {
+        const options = (nccDictionary[cat] || []).filter(w => w.toUpperCase().startsWith(cleanLetter));
+        return options.length > 0 ? options[Math.floor(Math.random() * options.length)] : '';
+      };
+      return {
+        NOME: getWord('NOME'),
+        COSA: getWord('COSA'),
+        CITTA: getWord('CITTA'),
+        ANIMALE: getWord('ANIMALE'),
+        MESTIERE: getWord('MESTIERE'),
+        FRUTTA: getWord('FRUTTA')
+      };
+    }
+
+    function isWordValidInVocab(cat, word, letter) {
+      if (!word || !letter) return false;
+      const cleanWord = word.trim().toUpperCase();
+      const cleanLetter = letter.trim().toUpperCase();
+      if (!cleanWord.startsWith(cleanLetter)) return false;
+      const catList = (nccDictionary[cat] || []).map(w => w.toUpperCase());
+      return catList.includes(cleanWord);
+    }
+
+    function evaluateNccMatch(p1Words, p2Words) {
+      const categories = ['NOME', 'COSA', 'CITTA', 'ANIMALE', 'MESTIERE', 'FRUTTA'];
+      
+      let p1Scores = {};
+      let p2Scores = {};
+      let p1Total = 0;
+      let p2Total = 0;
+
+      categories.forEach(cat => {
+        const rawW1 = p1Words[cat] || '';
+        const rawW2 = p2Words[cat] || '';
+        const w1Clean = rawW1.trim().toUpperCase();
+        const w2Clean = rawW2.trim().toUpperCase();
+
+        const valid1 = isWordValidInVocab(cat, rawW1, nccCurrentLetter);
+        const valid2 = isWordValidInVocab(cat, rawW2, nccCurrentLetter);
+
+        if (!valid1) {
+          p1Scores[cat] = 0;
+        } else if (valid1 && valid2 && w1Clean === w2Clean) {
+          p1Scores[cat] = 5;
+        } else {
+          p1Scores[cat] = 10;
+        }
+
+        if (!valid2) {
+          p2Scores[cat] = 0;
+        } else if (valid1 && valid2 && w1Clean === w2Clean) {
+          p2Scores[cat] = 5;
+        } else {
+          p2Scores[cat] = 10;
+        }
+
+        p1Total += p1Scores[cat];
+        p2Total += p2Scores[cat];
+      });
+
+      if (p1Total > p2Total) {
+        showGameResult(true, playerName, opponentName);
+        addWin('ncc');
+      } else if (p2Total > p1Total) {
+        showGameResult(false, opponentName, playerName);
+        addOpponentWin('ncc');
+      } else {
+        document.getElementById('statusMsg').textContent = `🤝 PARITÀ PERFETTA! Punteggio: ${p1Total} a ${p2Total}`;
+      }
+
+      // DISPOSE DEL RESOCONTO TABELLARE CONFORME ALL'IMMAGINE PROPOSTA
+      const resultsContainer = document.getElementById('nccResultsArea');
+      resultsContainer.innerHTML = `
+        <table class="ncc-grid-table">
+          <thead>
+            <tr>
+              <th>Giocatore</th>
+              <th>Nome</th>
+              <th>Cosa</th>
+              <th>Città</th>
+              <th>Animale</th>
+              <th>Mestiere</th>
+              <th>Frutta</th>
+              <th>TOTALE</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="ncc-player-row-title">${playerName}</td>
+              <td>${p1Words.NOME || '-'} <span class="pts-badge pts-${p1Scores.NOME}">[${p1Scores.NOME}pt]</span></td>
+              <td>${p1Words.COSA || '-'} <span class="pts-badge pts-${p1Scores.COSA}">[${p1Scores.COSA}pt]</span></td>
+              <td>${p1Words.CITTA || '-'} <span class="pts-badge pts-${p1Scores.CITTA}">[${p1Scores.CITTA}pt]</span></td>
+              <td>${p1Words.ANIMALE || '-'} <span class="pts-badge pts-${p1Scores.ANIMALE}">[${p1Scores.ANIMALE}pt]</span></td>
+              <td>${p1Words.MESTIERE || '-'} <span class="pts-badge pts-${p1Scores.MESTIERE}">[${p1Scores.MESTIERE}pt]</span></td>
+              <td>${p1Words.FRUTTA || '-'} <span class="pts-badge pts-${p1Scores.FRUTTA}">[${p1Scores.FRUTTA}pt]</span></td>
+              <td style="font-weight:900; font-size:0.9rem; background:#f8fafc;">${p1Total}</td>
+            </tr>
+            <tr>
+              <td class="ncc-player-row-title">${opponentName}</td>
+              <td>${p2Words.NOME || '-'} <span class="pts-badge pts-${p2Scores.NOME}">[${p2Scores.NOME}pt]</span></td>
+              <td>${p2Words.COSA || '-'} <span class="pts-badge pts-${p2Scores.COSA}">[${p2Scores.COSA}pt]</span></td>
+              <td>${p2Words.CITTA || '-'} <span class="pts-badge pts-${p2Scores.CITTA}">[${p2Scores.CITTA}pt]</span></td>
+              <td>${p2Words.ANIMALE || '-'} <span class="pts-badge pts-${p2Scores.ANIMALE}">[${p2Scores.ANIMALE}pt]</span></td>
+              <td>${p2Words.MESTIERE || '-'} <span class="pts-badge pts-${p2Scores.MESTIERE}">[${p2Scores.MESTIERE}pt]</span></td>
+              <td>${p2Words.FRUTTA || '-'} <span class="pts-badge pts-${p2Scores.FRUTTA}">[${p2Scores.FRUTTA}pt]</span></td>
+              <td style="font-weight:900; font-size:0.9rem; background:#f8fafc;">${p2Total}</td>
+            </tr>
+          </tbody>
+        </table>
+      `;
+    }
+
+
+    // ==========================================
+    // 4. BRISCOLA & SCOPA
+    // ==========================================
+    function initBriscolaEngine() {
+      document.getElementById('statusMsg').textContent = `Briscola Napoletana: ${playerName}, seleziona la tua carta.`;
+      document.getElementById('gameContainer').innerHTML = `
+        <div class="cards-board">
+          <div class="table-cards-zone">
+            <div class="napoletana-card suit-denari"><div style="font-weight:bold;">1</div><div>🪙</div><div>Denari</div></div>
+          </div>
+          <div class="player-hand-zone">
+            <div class="napoletana-card suit-coppe" onclick="playCardB(true)"><div style="font-weight:bold;">3</div><div>🏆</div><div>Coppe</div></div>
+            <div class="napoletana-card suit-bastoni" onclick="playCardB(false)"><div style="font-weight:bold;">7</div><div>🪵</div><div>Bastoni</div></div>
+          </div>
+        </div>
+      `;
+    }
+    function playCardB(win) {
+      if(win) {
+        showGameResult(true, playerName, opponentName);
+        addWin('briscola');
+      } else {
+        showGameResult(false, opponentName, playerName);
+        addOpponentWin('briscola');
+      }
+    }
+
+    function initScopaEngine() {
+      document.getElementById('statusMsg').textContent = `Scopa Napoletana: Fai scopa per vincere!`;
+      document.getElementById('gameContainer').innerHTML = `
+        <div class="cards-board">
+          <div class="table-cards-zone">
+            <div class="napoletana-card suit-spade"><div style="font-weight:bold;">7</div><div>🗡️</div><div>Spade</div></div>
+          </div>
+          <div class="player-hand-zone">
+            <div class="napoletana-card suit-spade" onclick="playCardS(true)"><div style="font-weight:bold;">7</div><div>🗡️</div><div>Spade</div></div>
+          </div>
+        </div>
+      `;
+    }
+    function playCardS(win) {
+      if(win) {
+        showGameResult(true, playerName, opponentName);
+        addWin('scopa');
+      } else {
+        showGameResult(false, opponentName, playerName);
+        addOpponentWin('scopa');
+      }
+    }
+
+
+    // ==========================================
+    // 5. IMPICCATO & TRIS
+    // ==========================================
+    function initImpiccato() {
+      document.getElementById('statusMsg').textContent = "Indovina la parola segreta!";
+      document.getElementById('gameContainer').innerHTML = `
+        <div style="font-size:1.5rem; letter-spacing:4px; font-weight:bold; margin-bottom:0.4rem; color:#facc15;">_ A _ A _ A</div>
+        <div style="display:flex; gap:0.3rem;">
+          <button class="btn" onclick="guessImp(true)">Indovina 'B'</button>
+          <button class="btn btn-stop" onclick="guessImp(false)">Sbaglia 'Z'</button>
+        </div>
+      `;
+    }
+    function guessImp(win) {
+      if(win) {
+        showGameResult(true, playerName, opponentName);
+        addWin('impiccato');
+      } else {
+        showGameResult(false, opponentName, playerName);
+        addOpponentWin('impiccato');
+      }
+    }
+
+    let trisState = Array(9).fill('');
+    function initTris() {
+      trisState = Array(9).fill('');
+      document.getElementById('statusMsg').textContent = `Tris: Fai 3 in fila contro ${opponentName}!`;
+      document.getElementById('gameContainer').innerHTML = `
+        <div style="display:grid; grid-template-columns:repeat(3,45px); gap:4px;">
+          ${trisState.map((_,i) => `<div style="width:45px; height:45px; background:#334155; border-radius:4px; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:1.2rem; cursor:pointer;" onclick="clickTris(${i}, this)"></div>`).join('')}
+        </div>
+      `;
+    }
+    function clickTris(i, el) {
+      if(el.textContent) return;
+      el.textContent = 'X'; el.style.color = '#38bdf8';
+      showGameResult(true, playerName, opponentName);
+      addWin('tris');
+    }
+
+    resetCurrentGame();
+  </script>
+</body>
+</html>
