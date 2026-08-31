@@ -1,9 +1,8 @@
-
 <!DOCTYPE html>
 <html lang="it">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Game & Web Radio Hub - gioco26 Edition</title>
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
   <style>
@@ -21,66 +20,63 @@
       --card-bg: #fffdf5;
       --cell-size: 24px;
     }
-
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
-    body { background-color: var(--bg-dark); color: var(--text); height: 100vh; display: flex; overflow: hidden; }
-
+    html, body { width: 100%; min-height: 100%; }
+    body { background-color: var(--bg-dark); color: var(--text); display: flex; overflow-x: hidden; }
     .app-layout { display: flex; width: 100vw; height: 100vh; overflow: hidden; }
     .main-section { flex: 1; display: flex; flex-direction: column; gap: 0.4rem; padding: 0.5rem; border-right: 2px solid var(--border); overflow: hidden; height: 100vh; }
-
-    /* BARRA DI NAVIGAZIONE E SELEZIONE NOMI GIOCATORI */
-    .game-nav { display: flex; gap: 0.3rem; justify-content: space-between; align-items: center; background: var(--panel-bg); padding: 0.4rem; border-radius: 8px; border: 1px solid var(--border); flex-shrink: 0; }
-    .tab-btn { background: #334155; color: white; border: none; padding: 0.3rem 0.5rem; border-radius: 5px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 0.75rem; }
+    
+    /* NAVIGAZIONE E UTENTI */
+    .game-nav { display: flex; gap: 0.4rem; justify-content: space-between; align-items: center; background: var(--panel-bg); padding: 0.4rem; border-radius: 8px; border: 1px solid var(--border); flex-shrink: 0; flex-wrap: wrap; }
+    .tab-btn { background: #334155; color: white; border: none; padding: 0.35rem 0.6rem; border-radius: 5px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 0.75rem; }
     .tab-btn.active, .tab-btn:hover { background: var(--accent); }
     .mode-select, .player-input { background: #0f172a; color: white; border: 1px solid var(--border); padding: 0.25rem 0.4rem; border-radius: 5px; font-size: 0.75rem; outline: none; }
-
-    /* UTENZA ONLINE GIOCO26 */
-    .online-box { display: flex; align-items: center; justify-content: space-between; background: #0f172a; padding: 0.3rem 0.6rem; border-radius: 6px; border: 1px solid var(--accent); font-size: 0.7rem; flex-shrink: 0; }
+    
+    .online-box { display: flex; align-items: center; justify-content: space-between; background: #0f172a; padding: 0.4rem 0.6rem; border-radius: 6px; border: 1px solid var(--accent); font-size: 0.7rem; flex-shrink: 0; flex-wrap: wrap; gap: 0.4rem; }
     .user-badge { background: var(--accent); color: white; padding: 0.15rem 0.4rem; border-radius: 4px; font-weight: bold; font-family: monospace; }
     .player-limit-tag { background: #334155; color: var(--yellow); padding: 0.15rem 0.4rem; border-radius: 4px; font-weight: bold; font-size: 0.7rem; }
-
-    /* TABELLA PUNTEGGI INDIPENDENTI PER ENTRAMBI I GIOCATORI */
-    .scoreboard-box { background: #0f172a; border: 1px solid var(--border); border-radius: 6px; padding: 0.3rem 0.6rem; font-size: 0.7rem; flex-shrink: 0; }
-    .scoreboard-table { width: 100%; border-collapse: collapse; text-align: center; }
+    
+    /* SEGNAPUNTI */
+    .scoreboard-box { background: #0f172a; border: 1px solid var(--border); border-radius: 6px; padding: 0.3rem 0.6rem; font-size: 0.7rem; flex-shrink: 0; overflow-x: auto; }
+    .scoreboard-table { width: 100%; border-collapse: collapse; text-align: center; min-width: 480px; }
     .scoreboard-table th, .scoreboard-table td { padding: 0.15rem 0.3rem; border-bottom: 1px solid #1e293b; font-size: 0.7rem; }
     .scoreboard-table th { color: var(--accent); font-weight: bold; }
-
-    /* CONTAINER PRINCIPALE GIOCO */
-    .game-card { background: var(--panel-bg); border-radius: 10px; padding: 0.6rem; text-align: center; flex: 1; display: flex; flex-direction: column; justify-content: space-between; align-items: center; border: 1px solid var(--border); overflow-y: auto; position: relative; }
+    
+    /* CONTAINER GIOCO */
+    .game-card { background: var(--panel-bg); border-radius: 10px; padding: 0.6rem; text-align: center; flex: 1; display: flex; flex-direction: column; justify-content: space-between; align-items: center; border: 1px solid var(--border); overflow-y: auto; position: relative; min-height: 320px; }
     .game-title { font-size: 1rem; font-weight: 700; color: #38bdf8; }
     .status-msg { font-size: 0.75rem; font-weight: 600; color: var(--text-muted); background: rgba(0,0,0,0.3); padding: 0.2rem 0.6rem; border-radius: 12px; max-width: 95%; margin: 0.2rem 0; }
-
-    /* BANNER RISULTATO */
+    
     .result-banner { display: none; width: 100%; padding: 0.4rem; border-radius: 6px; font-weight: 800; font-size: 0.85rem; text-align: center; margin-bottom: 0.2rem; }
     .result-banner.win { background: #15803d; color: #fef08a; border: 1px solid #22c55e; }
     .result-banner.loss { background: #991b1b; color: #fecaca; border: 1px solid #ef4444; }
-
-    /* NOME COSE CITTA ANIMAL MESTIERE FRUTTA STYLES */
-    .ncc-container { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; width: 100%; max-width: 700px; }
-    .wheel-container { position: relative; width: 140px; height: 140px; margin: 0.2rem 0; }
-    .wheel-pointer { position: absolute; top: -8px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-top: 16px solid #ef4444; z-index: 10; }
-    canvas#wheelCanvas { width: 140px; height: 140px; border-radius: 50%; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
     
-    .ncc-form-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.3rem; width: 100%; }
-    .ncc-field-box { display: flex; flex-direction: column; text-align: left; }
-    .ncc-field-box label { font-size: 0.62rem; color: var(--text-muted); font-weight: bold; text-transform: uppercase; margin-bottom: 2px; }
-    .ncc-field-input { background: #0f172a; border: 1px solid var(--border); border-radius: 4px; color: white; padding: 0.3rem; font-size: 0.72rem; width: 100%; outline: none; }
-    .ncc-field-input:disabled { background: #1e293b; opacity: 0.7; }
-
-    .timer-badge { font-size: 1.1rem; font-weight: 800; color: var(--yellow); background: #0f172a; padding: 0.2rem 0.8rem; border-radius: 20px; border: 1px solid var(--yellow); display: inline-flex; align-items: center; gap: 0.4rem; }
-
-    /* TABELLA EREDITATA DALL'IMMAGINE PROPOSTA */
-    .ncc-grid-table { width: 100%; border-collapse: collapse; margin-top: 0.4rem; background: #ffffff; color: #000000; border: 2px solid #000000; font-size: 0.75rem; }
-    .ncc-grid-table th, .ncc-grid-table td { border: 1px solid #000000; padding: 0.3rem; text-align: center; }
-    .ncc-grid-table th { background: #f1f5f9; font-weight: bold; color: #000000; }
-    .ncc-player-row-title { font-weight: bold; background: #e2e8f0; text-align: left !important; padding-left: 0.4rem !important; }
-    .pts-badge { font-weight: bold; display: block; font-size: 0.65rem; }
+    /* NOMI COSE CITTA */
+    .ncc-container { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; width: 100%; max-width: 900px; }
+    .ncc-header-bar { display: flex; align-items: center; justify-content: space-between; width: 100%; background: #0f172a; padding: 0.4rem 0.8rem; border-radius: 8px; border: 1px solid var(--border); flex-wrap: wrap; gap: 0.4rem; }
+    .wheel-container { position: relative; width: 80px; height: 80px; }
+    .wheel-pointer { position: absolute; top: -6px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 8px solid transparent; border-right: 8px solid transparent; border-top: 14px solid #ef4444; z-index: 10; }
+    canvas#wheelCanvas { width: 80px; height: 80px; border-radius: 50%; box-shadow: 0 0 8px rgba(0,0,0,0.5); }
+    
+    .ncc-horizontal-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.4rem; width: 100%; margin: 0.3rem 0; }
+    .ncc-field-box { display: flex; flex-direction: column; gap: 0.2rem; background: #0f172a; padding: 0.35rem; border-radius: 6px; border: 1px solid var(--border); text-align: left; }
+    .ncc-field-box label { font-size: 0.68rem; color: #38bdf8; font-weight: bold; text-transform: uppercase; }
+    .ncc-field-input { background: #1e293b; border: 1px solid var(--border); border-radius: 4px; color: white; padding: 0.3rem; font-size: 0.75rem; outline: none; width: 100%; }
+    .ncc-field-input:disabled { background: #0f172a; opacity: 0.5; }
+    .timer-badge { font-size: 0.85rem; font-weight: 800; color: var(--yellow); background: #0f172a; padding: 0.2rem 0.6rem; border-radius: 20px; border: 1px solid var(--yellow); display: inline-flex; align-items: center; gap: 0.3rem; }
+    
+    .ncc-grid-table { width: 100%; border-collapse: collapse; margin-top: 0.3rem; background: #ffffff; color: #000000; border: 2px solid #000000; font-size: 0.65rem; }
+    .ncc-grid-table th, .ncc-grid-table td { border: 1px solid #000000; padding: 0.2rem; text-align: center; }
+    .ncc-grid-table th { background: #e2e8f0; font-weight: bold; color: #000000; }
+    .ncc-player-row-title { font-weight: bold; background: #f1f5f9; text-align: left !important; padding-left: 0.4rem !important; }
+    .pts-badge { font-weight: bold; display: inline-block; font-size: 0.65rem; margin-left: 2px; }
     .pts-10 { color: #166534; }
     .pts-5 { color: #b45309; }
     .pts-0 { color: #991b1b; }
+    .total-pts-col { background: #fef08a !important; font-weight: 900 !important; font-size: 0.75rem !important; color: #000 !important; border-left: 2px solid #000 !important; }
 
-    /* BATTAGLIA NAVALE & CONTATORE NAVI */
-    .naval-boards-wrapper { display: flex; gap: 0.8rem; justify-content: center; width: 100%; }
+    /* BATTAGLIA NAVALE */
+    .naval-boards-wrapper { display: flex; gap: 0.8rem; justify-content: center; width: 100%; flex-wrap: wrap; }
     .board-container { display: flex; flex-direction: column; align-items: center; gap: 0.2rem; }
     .board-label { font-size: 0.7rem; font-weight: bold; color: var(--accent); }
     .naval-board { display: grid; gap: 2px; justify-content: center; padding: 3px; background: #0f172a; border-radius: 6px; border: 1px solid var(--border); }
@@ -88,9 +84,8 @@
     .naval-cell.ship { background: #475569; }
     .naval-cell.hit { background: #ef4444 !important; }
     .naval-cell.miss { background: #334155 !important; }
-    
-    .naval-stats-bar { display: flex; gap: 0.6rem; justify-content: center; width: 100%; margin-bottom: 0.3rem; }
-    .naval-stat-box { background: #0f172a; border: 1px solid var(--border); padding: 0.25rem 0.5rem; border-radius: 6px; font-size: 0.68rem; text-align: center; flex: 1; max-width: 220px; }
+    .naval-stats-bar { display: flex; gap: 0.6rem; justify-content: center; width: 100%; margin-bottom: 0.3rem; flex-wrap: wrap; }
+    .naval-stat-box { background: #0f172a; border: 1px solid var(--border); padding: 0.25rem 0.5rem; border-radius: 6px; font-size: 0.68rem; text-align: center; flex: 1; min-width: 140px; max-width: 220px; }
     .naval-stat-box b { color: #38bdf8; }
 
     /* DAMA TRADIZIONALE */
@@ -102,84 +97,128 @@
     .dama-piece.white { background: #ffffff; color: #000; border: 2px solid #ccc; }
     .dama-piece.black { background: #262421; color: #fff; border: 2px solid #555; }
 
-    /* CARTE NAPOLETANE COMPATTE */
-    .cards-board { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; width: 100%; max-width: 480px; }
-    .table-cards-zone { display: flex; gap: 0.4rem; justify-content: center; min-height: 90px; background: #064e3b; padding: 0.4rem; border-radius: 8px; width: 100%; border: 2px solid #047857; align-items: center; position: relative; }
-    .player-hand-zone { display: flex; gap: 0.4rem; justify-content: center; }
-    .napoletana-card { width: 55px; height: 85px; background: var(--card-bg); border-radius: 6px; border: 1.5px solid #8c7355; display: flex; flex-direction: column; justify-content: space-between; padding: 0.2rem; cursor: pointer; color: #1e293b; position: relative; font-size: 0.7rem; }
-    .suit-denari { color: #b45309; background: #fef3c7; }
-    .suit-coppe { color: #991b1b; background: #fee2e2; }
-    .suit-bastoni { color: #166534; background: #dcfce7; }
-    .suit-spade { color: #1e40af; background: #dbeafe; }
+    /* CARTE NAPOLETANE */
+    .cards-board { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; width: 100%; max-width: 520px; }
+    .table-cards-zone { display: flex; gap: 0.4rem; justify-content: center; min-height: 105px; background: radial-gradient(circle, #065f46 0%, #042f2e 100%); padding: 0.5rem; border-radius: 10px; width: 100%; border: 3px solid #059669; align-items: center; position: relative; box-shadow: inset 0 0 12px rgba(0,0,0,0.5); flex-wrap: wrap; }
+    .player-hand-zone { display: flex; gap: 0.4rem; justify-content: center; margin-top: 0.2rem; }
+    
+    .napoletana-card {
+      width: 62px;
+      height: 95px;
+      background: linear-gradient(135deg, #fffdf5 0%, #f5e6c8 100%);
+      border-radius: 6px;
+      border: 2px solid #b8860b;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.4), inset 0 0 4px rgba(184,134,11,0.3);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 0.2rem;
+      cursor: pointer;
+      color: #1e293b;
+      position: relative;
+      font-size: 0.65rem;
+      user-select: none;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .napoletana-card:hover { transform: translateY(-4px); box-shadow: 0 8px 12px rgba(0,0,0,0.5); }
+    .napoletana-card.back-card {
+      background: repeating-linear-gradient(45deg, #1e293b, #1e293b 8px, #0f172a 8px, #0f172a 16px);
+      border: 2px solid #94a3b8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #94a3b8;
+      font-size: 1.2rem;
+    }
+    .card-top-left { display: flex; justify-content: space-between; align-items: center; font-weight: 800; font-size: 0.65rem; line-height: 1; }
+    .card-center-art { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; font-size: 1.1rem; margin: 2px 0; }
+    .card-bottom-right { display: flex; justify-content: space-between; align-items: center; font-size: 0.55rem; font-weight: 700; text-transform: capitalize; }
 
-    /* SIDEBAR VERTICALE DESTRA (CHAT + RADIO INTEGRATE IN VERTICALE) */
+    .suit-denari { color: #b45309; border-color: #d97706; }
+    .suit-coppe { color: #991b1b; border-color: #dc2626; }
+    .suit-bastoni { color: #166534; border-color: #16a34a; }
+    .suit-spade { color: #1e40af; border-color: #2563eb; }
+
+    /* IMPICCATO */
+    .impiccato-container { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; width: 100%; max-width: 500px; }
+    .impiccato-svg-box { background: #0f172a; border: 2px solid var(--border); border-radius: 8px; padding: 0.4rem; width: 150px; height: 140px; }
+    .word-letters-box { display: flex; gap: 0.25rem; justify-content: center; margin: 0.3rem 0; flex-wrap: wrap; }
+    .letter-slot { width: 26px; height: 34px; border-bottom: 3px solid #38bdf8; font-size: 1rem; font-weight: 800; display: flex; align-items: center; justify-content: center; text-transform: uppercase; color: #ffffff; background: rgba(255,255,255,0.05); border-radius: 4px 4px 0 0; }
+    .kb-row { display: flex; flex-wrap: wrap; gap: 0.2rem; justify-content: center; max-width: 440px; }
+    .kb-key { background: #334155; color: white; border: 1px solid var(--border); width: 28px; height: 30px; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 0.75rem; }
+    .kb-key:disabled { opacity: 0.3; cursor: not-allowed; background: #0f172a; }
+
+    /* TRIS */
+    .tris-grid { display: grid; grid-template-columns: repeat(3, 65px); grid-template-rows: repeat(3, 65px); gap: 5px; margin: 0.5rem 0; }
+    .tris-cell { background: #0f172a; border: 2px solid var(--border); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; font-weight: 900; cursor: pointer; user-select: none; }
+    .tris-cell:hover { background: #1e293b; }
+
+    /* SIDEBAR */
     .sidebar-right { width: 260px; background: #18181c; padding: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem; flex-shrink: 0; border-left: 2px solid var(--border); height: 100vh; overflow: hidden; }
-
-    .chat-card { background: var(--panel-bg); border-radius: 8px; border: 1px solid var(--border); flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 200px; }
+    .chat-card { background: var(--panel-bg); border-radius: 8px; border: 1px solid var(--border); flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 180px; }
     .chat-header { font-size: 0.75rem; font-weight: 700; padding: 0.3rem 0.5rem; background: #0f172a; border-bottom: 1px solid var(--border); color: var(--accent); }
     .chat-messages { flex: 1; padding: 0.3rem; overflow-y: auto; font-size: 0.7rem; display: flex; flex-direction: column; gap: 0.2rem; }
     .chat-msg { background: #0f172a; padding: 0.2rem 0.4rem; border-radius: 4px; word-break: break-word; }
     .chat-input-row { display: flex; padding: 0.3rem; gap: 0.3rem; background: #0f172a; border-top: 1px solid var(--border); }
-
-    .sidebar-radio { background: var(--panel-bg); border-radius: 8px; border: 1px solid var(--border); padding: 0.5rem; display: flex; flex-direction: column; gap: 0.4rem; flex: 1; overflow: hidden; min-height: 200px; }
+    .sidebar-radio { background: var(--panel-bg); border-radius: 8px; border: 1px solid var(--border); padding: 0.5rem; display: flex; flex-direction: column; gap: 0.4rem; flex: 1; overflow: hidden; min-height: 180px; }
     .radio-list { display: flex; flex-direction: column; gap: 0.25rem; overflow-y: auto; flex: 1; }
     .radio-card { display: flex; align-items: center; justify-content: space-between; background: #0f172a; padding: 0.3rem 0.5rem; border-radius: 6px; cursor: pointer; font-size: 0.7rem; }
-
     .btn { background: var(--accent); color: white; border: none; padding: 0.3rem 0.6rem; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 0.75rem; }
     .btn-stop { background: var(--red); }
     .btn-success { background: var(--green); }
 
-    /* ADATTAMENTO RESPONSIVO PER TELEFONINI */
+    /* ADATTAMENTO MOBILE */
     @media (max-width: 768px) {
-      .app-layout { flex-direction: column; overflow-y: auto; height: auto; }
-      .main-section { height: auto; border-right: none; border-bottom: 2px solid var(--border); }
-      .sidebar-right { width: 100%; height: auto; border-left: none; }
+      body { overflow-y: auto; height: auto; }
+      .app-layout { flex-direction: column; overflow-y: auto; height: auto; min-height: 100vh; }
+      .main-section { height: auto; border-right: none; border-bottom: 2px solid var(--border); overflow: visible; }
+      .game-card { min-height: 360px; overflow-y: visible; }
+      .sidebar-right { width: 100%; height: auto; border-left: none; overflow: visible; }
       .naval-boards-wrapper { flex-direction: column; align-items: center; }
-      .ncc-form-row { grid-template-columns: repeat(2, 1fr); }
+      .ncc-horizontal-grid { grid-template-columns: repeat(3, 1fr); }
     }
   </style>
 </head>
 <body>
-
   <div class="app-layout">
     
     <!-- SEZIONE PRINCIPALE -->
     <div class="main-section">
       
-      <!-- NAVIGAZIONE GIOCHI E NOMI GIOCATORI -->
+      <!-- NAVIGAZIONE GIOCHI -->
       <div class="game-nav">
         <div style="display: flex; gap: 0.2rem; flex-wrap: wrap;">
-          <button class="tab-btn active" onclick="switchGame('battaglia')">⚓ Battaglia</button>
-          <button class="tab-btn" onclick="switchGame('dama')">⚪⚫ Dama</button>
-          <button class="tab-btn" onclick="switchGame('ncc')">✏️ Nome Cose Città</button>
-          <button class="tab-btn" onclick="switchGame('briscola')">🃏 Briscola</button>
-          <button class="tab-btn" onclick="switchGame('scopa')">🧹 Scopa</button>
-          <button class="tab-btn" onclick="switchGame('impiccato')">🔤 Impiccato</button>
-          <button class="tab-btn" onclick="switchGame('tris')">❌⭕ Tris</button>
+          <button class="tab-btn active" onclick="switchGame('battaglia', this)">⚓ Battaglia</button>
+          <button class="tab-btn" onclick="switchGame('dama', this)">⚪⚫ Dama</button>
+          <button class="tab-btn" onclick="switchGame('ncc', this)">✏️ Nome Cose Città</button>
+          <button class="tab-btn" onclick="switchGame('briscola', this)">🃏 Briscola</button>
+          <button class="tab-btn" onclick="switchGame('scopa', this)">🧹 Scopa</button>
+          <button class="tab-btn" onclick="switchGame('impiccato', this)">🔤 Impiccato</button>
+          <button class="tab-btn" onclick="switchGame('tris', this)">❌⭕ Tris</button>
         </div>
-        <div style="display:flex; gap:0.2rem; align-items:center;">
-          <button class="btn" style="padding:0.25rem 0.4rem; font-size:0.7rem;" onclick="promptPlayerName()" title="Scegli il tuo nome">👤 Scegli Nome</button>
-          <input type="text" id="playerNameInput" class="player-input" value="Giocatore 1" oninput="updatePlayerNames()" onchange="updatePlayerNames()" placeholder="G1" style="width:80px;" title="Nome Giocatore 1">
+        <div style="display:flex; gap:0.2rem; align-items:center; flex-wrap:wrap;">
+          <button class="btn" style="padding:0.25rem 0.4rem; font-size:0.7rem;" onclick="promptPlayerName()">👤 Nome</button>
+          <input type="text" id="playerNameInput" class="player-input" value="Giocatore 1" oninput="updatePlayerNames()" style="width:75px;">
           <span style="font-size:0.7rem; color:var(--text-muted); font-weight:bold;">VS</span>
-          <input type="text" id="opponentNameInput" class="player-input" value="Bot" oninput="updatePlayerNames()" onchange="updatePlayerNames()" placeholder="G2 / Bot" style="width:80px;" title="Nome Giocatore 2 / Bot">
+          <input type="text" id="opponentNameInput" class="player-input" value="Bot" oninput="updatePlayerNames()" style="width:75px;">
           <select id="opponentMode" class="mode-select" onchange="handleModeChange()">
-            <option value="bot">🤖 Sfida Bot</option>
+            <option value="bot">🤖 Bot</option>
             <option value="online">📱 Online</option>
           </select>
         </div>
       </div>
 
-      <!-- UTENZA ONLINE GIOCO26 -->
+      <!-- UTENZA ONLINE -->
       <div class="online-box">
         <div>Utenza gioco26: <span class="user-badge" id="myPeerId">Generazione...</span></div>
-        <div style="display:flex; gap:0.3rem; align-items:center;">
+        <div style="display:flex; gap:0.3rem; align-items:center; flex-wrap:wrap;">
           <span class="player-limit-tag" id="ruleLimitTag">Capacità: 2 Giocatori</span>
           <input type="text" id="targetPeerInput" class="player-input" placeholder="Codice gioco26" style="width:110px;">
           <button class="btn btn-success" onclick="connectToPeer()">🔗 Connetti</button>
         </div>
       </div>
 
-      <!-- SEGNAPUNTI INDIPENDENTI -->
+      <!-- SEGNAPUNTI -->
       <div class="scoreboard-box">
         <table class="scoreboard-table">
           <thead>
@@ -205,23 +244,20 @@
         <div id="resultBanner" class="result-banner"></div>
         <div class="status-msg" id="statusMsg">Caricamento...</div>
         
-        <div id="gameContainer" style="width:100%; flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; overflow:hidden;"></div>
+        <div id="gameContainer" style="width:100%; flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;"></div>
         
         <div style="display:flex; gap:0.4rem; margin-top: 0.3rem;">
           <button class="btn" onclick="resetCurrentGame()">🔄 Nuova Partita</button>
         </div>
       </div>
-
     </div>
 
-    <!-- SIDEBAR VERTICALE DESTRA (CHAT + RADIO) -->
+    <!-- SIDEBAR DESTRA -->
     <div class="sidebar-right">
-      
-      <!-- CHAT LIVE VERTICALE -->
       <div class="chat-card">
         <div class="chat-header">💬 Chat Live Online</div>
         <div class="chat-messages" id="chatLogs">
-          <div class="chat-msg"><span style="color:var(--accent); font-weight:bold;">Sistema:</span> Benvenuto nella piattaforma gioco26!</div>
+          <div class="chat-msg"><span style="color:var(--accent); font-weight:bold;">Sistema:</span> Benvenuto su gioco26!</div>
         </div>
         <div class="chat-input-row">
           <input type="text" id="chatInput" class="chat-input player-input" style="flex:1;" placeholder="Scrivi..." onkeydown="if(event.key==='Enter') sendChatMessage()">
@@ -229,7 +265,6 @@
         </div>
       </div>
 
-      <!-- SIDEBAR RADIO MULTICANALE -->
       <div class="sidebar-radio">
         <div style="font-size:0.8rem; font-weight:700;">📻 Web Radio Live</div>
         <div style="background:#0f172a; padding:0.4rem; border-radius:6px; text-align:center; border:1px solid var(--border);">
@@ -238,61 +273,71 @@
         </div>
         <div class="radio-list" id="radioList"></div>
       </div>
-
     </div>
-
   </div>
 
   <script>
-    // --- SINTETIZZATORE AUDIO & TICCHETTIO OROLOGIO ---
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    // --- SINTETIZZATORE AUDIO SAFARI-SAFE ---
+    let audioCtx = null;
+    function getAudioCtx() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      return audioCtx;
+    }
 
     function playTickSound() {
-      if (audioCtx.state === 'suspended') audioCtx.resume();
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(800, audioCtx.currentTime);
-      gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.start();
-      osc.stop(audioCtx.currentTime + 0.05);
+      try {
+        const ctx = getAudioCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(800, ctx.currentTime);
+        gain.gain.setValueAtTime(0.08, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.05);
+      } catch(e) {}
     }
 
     function playSound(type) {
-      if (audioCtx.state === 'suspended') audioCtx.resume();
-      
-      if (type === 'win') {
-        const notes = [523.25, 659.25, 783.99, 1046.50];
-        notes.forEach((freq, idx) => {
-          const osc = audioCtx.createOscillator();
-          const gain = audioCtx.createGain();
-          osc.type = 'triangle';
-          osc.frequency.value = freq;
-          gain.gain.setValueAtTime(0.15, audioCtx.currentTime + idx * 0.12);
-          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + idx * 0.12 + 0.3);
-          osc.connect(gain);
-          gain.connect(audioCtx.destination);
-          osc.start(audioCtx.currentTime + idx * 0.12);
-          osc.stop(audioCtx.currentTime + idx * 0.12 + 0.3);
-        });
-      } else if (type === 'loss') {
-        const notes = [300, 260, 220, 180];
-        notes.forEach((freq, idx) => {
-          const osc = audioCtx.createOscillator();
-          const gain = audioCtx.createGain();
-          osc.type = 'sawtooth';
-          osc.frequency.value = freq;
-          gain.gain.setValueAtTime(0.15, audioCtx.currentTime + idx * 0.15);
-          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + idx * 0.15 + 0.35);
-          osc.connect(gain);
-          gain.connect(audioCtx.destination);
-          osc.start(audioCtx.currentTime + idx * 0.15);
-          osc.stop(audioCtx.currentTime + idx * 0.15 + 0.35);
-        });
-      }
+      try {
+        const ctx = getAudioCtx();
+        if (type === 'win') {
+          const notes = [523.25, 659.25, 783.99, 1046.50];
+          notes.forEach((freq, idx) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.15, ctx.currentTime + idx * 0.12);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + idx * 0.12 + 0.3);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(ctx.currentTime + idx * 0.12);
+            osc.stop(ctx.currentTime + idx * 0.12 + 0.3);
+          });
+        } else if (type === 'loss') {
+          const notes = [300, 260, 220, 180];
+          notes.forEach((freq, idx) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.15, ctx.currentTime + idx * 0.15);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + idx * 0.15 + 0.35);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(ctx.currentTime + idx * 0.15);
+            osc.stop(ctx.currentTime + idx * 0.15 + 0.35);
+          });
+        }
+      } catch(e) {}
     }
 
     function showGameResult(isWin, winnerName, loserName) {
@@ -308,26 +353,24 @@
         playSound('loss');
       }
     }
-
     function hideResultBanner() {
       document.getElementById('resultBanner').style.display = 'none';
     }
 
-    // --- PUNTEGGI INDIPENDENTI E SCELTA NOME GIOCATORE ---
+    // --- SEGNAPUNTI E UTENTI ---
     let playerName = "Giocatore 1";
     let opponentName = "Bot";
     let scores = { battaglia: 0, dama: 0, ncc: 0, briscola: 0, scopa: 0, impiccato: 0, tris: 0 };
     let opponentScores = { battaglia: 0, dama: 0, ncc: 0, briscola: 0, scopa: 0, impiccato: 0, tris: 0 };
-
+    
     function promptPlayerName() {
-      const newName = prompt("Inserisci il nome del giocatore:", playerName);
+      const newName = prompt("Inserisci il tuo nome:", playerName);
       if (newName !== null && newName.trim() !== "") {
         playerName = newName.trim();
         document.getElementById('playerNameInput').value = playerName;
         updatePlayerNames();
       }
     }
-
     function updatePlayerNames() {
       const inputP1 = document.getElementById('playerNameInput').value.trim();
       const inputP2 = document.getElementById('opponentNameInput').value.trim();
@@ -335,73 +378,54 @@
       opponentName = inputP2 !== "" ? inputP2 : "Bot";
       renderScoreboard();
     }
-
-    function addWin(gameKey) {
-      scores[gameKey]++;
-      renderScoreboard();
-    }
-
-    function addOpponentWin(gameKey) {
-      opponentScores[gameKey]++;
-      renderScoreboard();
-    }
-
+    function addWin(gameKey) { scores[gameKey]++; renderScoreboard(); }
+    function addOpponentWin(gameKey) { opponentScores[gameKey]++; renderScoreboard(); }
     function renderScoreboard() {
       const body = document.getElementById('scoreboardBody');
       body.innerHTML = `
         <tr>
           <td style="font-weight:bold; color:#38bdf8;">${playerName}</td>
-          <td>${scores.battaglia}</td>
-          <td>${scores.dama}</td>
-          <td>${scores.ncc}</td>
-          <td>${scores.briscola}</td>
-          <td>${scores.scopa}</td>
-          <td>${scores.impiccato}</td>
-          <td>${scores.tris}</td>
+          <td>${scores.battaglia}</td><td>${scores.dama}</td><td>${scores.ncc}</td>
+          <td>${scores.briscola}</td><td>${scores.scopa}</td><td>${scores.impiccato}</td><td>${scores.tris}</td>
         </tr>
         <tr>
           <td style="font-weight:bold; color:#ef4444;">${opponentName}</td>
-          <td>${opponentScores.battaglia}</td>
-          <td>${opponentScores.dama}</td>
-          <td>${opponentScores.ncc}</td>
-          <td>${opponentScores.briscola}</td>
-          <td>${opponentScores.scopa}</td>
-          <td>${opponentScores.impiccato}</td>
-          <td>${opponentScores.tris}</td>
+          <td>${opponentScores.battaglia}</td><td>${opponentScores.dama}</td><td>${opponentScores.ncc}</td>
+          <td>${opponentScores.briscola}</td><td>${opponentScores.scopa}</td><td>${opponentScores.impiccato}</td><td>${opponentScores.tris}</td>
         </tr>
       `;
     }
     renderScoreboard();
 
-    // --- REGOLE E LIMITI GIOCATORI ONLINE ---
+    // --- REGOLE E SWITCH GIOCHI ---
     const GAME_RULES = {
       battaglia: { name: "Battaglia Navale", maxPlayers: "2 Giocatori (1v1)" },
       dama: { name: "Dama Tradizionale", maxPlayers: "2 Giocatori (1v1)" },
       ncc: { name: "Nome Cose Città Animale Mestiere Frutta", maxPlayers: "2 a 5 Giocatori" },
-      briscola: { name: "Briscola Napoletana", maxPlayers: "2 o 4 Giocatori" },
+      briscola: { name: "Briscola Napoletana", maxPlayers: "2 Giocatori (1v1)" },
       scopa: { name: "Scopa Napoletana", maxPlayers: "2 Giocatori (1v1)" },
       impiccato: { name: "Impiccato Segreto", maxPlayers: "2 a 5 Giocatori" },
       tris: { name: "Tris Classico", maxPlayers: "2 Giocatori (1v1)" }
     };
-
     let currentGame = 'battaglia';
-
-    function switchGame(gameKey) {
+    
+    function switchGame(gameKey, btnElement) {
       currentGame = gameKey;
-      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-      event.target.classList.add('active');
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      if (btnElement) {
+        btnElement.classList.add('active');
+      }
       document.getElementById('ruleLimitTag').textContent = `Capacità: ${GAME_RULES[gameKey].maxPlayers}`;
       resetCurrentGame();
     }
-
+    
     function resetCurrentGame() {
       hideResultBanner();
-      if(nccTimerInterval) clearInterval(nccTimerInterval);
+      if(typeof nccTimerInterval !== 'undefined' && nccTimerInterval) clearInterval(nccTimerInterval);
       const container = document.getElementById('gameContainer');
       const title = document.getElementById('gameTitle');
       container.innerHTML = '';
       title.textContent = GAME_RULES[currentGame].name;
-
       if (currentGame === 'battaglia') setupNavalStep1();
       else if (currentGame === 'dama') initDamaEngine();
       else if (currentGame === 'ncc') initNCC();
@@ -411,17 +435,19 @@
       else if (currentGame === 'tris') initTris();
     }
 
-    // --- PEERJS MULTIPLAYER ---
+    // --- PEERJS ---
     let peer = null, peerConn = null, myPeerId = "";
     function initPeer() {
-      const randomId = "gioco26-" + Math.floor(1000 + Math.random() * 9000);
-      peer = new Peer(randomId);
-      peer.on('open', (id) => { myPeerId = id; document.getElementById('myPeerId').textContent = id; });
-      peer.on('connection', (conn) => { peerConn = conn; setupPeerListeners(); });
+      try {
+        const randomId = "gioco26-" + Math.floor(1000 + Math.random() * 9000);
+        peer = new Peer(randomId);
+        peer.on('open', (id) => { myPeerId = id; document.getElementById('myPeerId').textContent = id; });
+        peer.on('connection', (conn) => { peerConn = conn; setupPeerListeners(); });
+      } catch(e) {}
     }
     function connectToPeer() {
       const targetId = document.getElementById('targetPeerInput').value.trim();
-      if (targetId) peerConn = peer.connect(targetId);
+      if (targetId && peer) peerConn = peer.connect(targetId);
       setupPeerListeners();
     }
     function setupPeerListeners() {
@@ -464,18 +490,13 @@
       if(peerConn && peerConn.open) peerConn.send({type:'chat', sender:playerName, text:input.value.trim()});
       input.value = '';
     }
-
     const stations = [
       { name: "RAI Radio 1", url: "https://icestreaming.rai.it/1.mp3" },
       { name: "RAI Radio 2", url: "https://icestreaming.rai.it/2.mp3" },
       { name: "RAI Radio 3", url: "https://icestreaming.rai.it/3.mp3" },
       { name: "RAI Classica", url: "https://icestreaming.rai.it/5.mp3" },
-      { name: "RAI Isoradio", url: "https://icestreaming.rai.it/6.mp3" },
-      { name: "RSI Rete Uno (CH)", url: "https://stream.srg-ssr.ch/m/reteuno/mp3_128" },
-      { name: "RSI Rete Tre (CH)", url: "https://stream.srg-ssr.ch/m/retetre/mp3_128" },
-      { name: "Radio Popolare", url: "https://stream.radiopopolare.it/popolare.mp3" }
+      { name: "RAI Isoradio", url: "https://icestreaming.rai.it/6.mp3" }
     ];
-
     function renderStations() {
       const list = document.getElementById('radioList');
       list.innerHTML = '';
@@ -493,214 +514,106 @@
     }
     renderStations();
 
-
     // ==========================================
-    // 1. BATTAGLIA NAVALE ADATTIVA
+    // 1. BATTAGLIA NAVALE
     // ==========================================
     let navalPlayerGrid = [], navalBotGrid = [];
     let playerShipsList = [], botShipsList = [];
-    let navalSize = 10;
-    let shipsToPlace = [];
-    let currentShipIdx = 0;
-    let placementDir = 'H';
-    let totalShipTiles = 0;
-    let pHits = 0, bHits = 0;
-    let navalPhase = 'setup';
+    let navalSize = 10, shipsToPlace = [], currentShipIdx = 0, placementDir = 'H', totalShipTiles = 0, pHits = 0, bHits = 0, navalPhase = 'setup';
 
     function setupNavalStep1() {
       navalPhase = 'setup';
-      document.getElementById('statusMsg').textContent = "Passo 1: Decidi le navi. La griglia si adatterà automaticamente per coprire il 30%.";
+      document.getElementById('statusMsg').textContent = "Configura le navi della flotta.";
       document.getElementById('gameContainer').innerHTML = `
         <div style="display:flex; flex-direction:column; gap:0.4rem; background:#0f172a; padding:0.6rem 1rem; border-radius:8px; align-items:center; width:95%; max-width:360px; border:1px solid var(--border);">
-          <div style="font-size:0.75rem; font-weight:bold; color:var(--accent); margin-bottom:0.2rem;">Configurazione Flotta Sincronizzata</div>
-          <div style="display:flex; justify-content:space-between; width:100%; align-items:center; font-size:0.75rem;">
-            <label>Navi da 1 casella (🚤):</label>
-            <input type="number" id="n1" value="4" min="0" max="10" class="player-input" style="width:50px; text-align:center;" oninput="updateNavalPreview()">
-          </div>
-          <div style="display:flex; justify-content:space-between; width:100%; align-items:center; font-size:0.75rem;">
-            <label>Navi da 2 caselle (⛵):</label>
-            <input type="number" id="n2" value="4" min="0" max="10" class="player-input" style="width:50px; text-align:center;" oninput="updateNavalPreview()">
-          </div>
-          <div style="display:flex; justify-content:space-between; width:100%; align-items:center; font-size:0.75rem;">
-            <label>Navi da 3 caselle (🚢):</label>
-            <input type="number" id="n3" value="3" min="0" max="8" class="player-input" style="width:50px; text-align:center;" oninput="updateNavalPreview()">
-          </div>
-          <div style="display:flex; justify-content:space-between; width:100%; align-items:center; font-size:0.75rem;">
-            <label>Navi da 4 caselle (Battleship ⚓):</label>
-            <input type="number" id="n4" value="2" min="0" max="5" class="player-input" style="width:50px; text-align:center;" oninput="updateNavalPreview()">
-          </div>
-          
-          <div id="navalPreviewBox" style="background:#1e293b; width:100%; padding:0.4rem; border-radius:6px; font-size:0.7rem; color:var(--text-muted); text-align:center; border:1px solid var(--border);">
-            Calcolo schema in corso...
-          </div>
-          <button class="btn btn-success" style="width:100%; margin-top:0.3rem;" onclick="confirmNavalConfig()">Conferma Navi per Tutti i Giocatori ➡️</button>
+          <div style="font-size:0.75rem; font-weight:bold; color:var(--accent);">Configurazione Flotta</div>
+          <div style="display:flex; justify-content:space-between; width:100%; align-items:center; font-size:0.75rem;"><label>Navi 1 casella (🚤):</label><input type="number" id="n1" value="4" min="0" max="10" class="player-input" style="width:50px; text-align:center;" oninput="updateNavalPreview()"></div>
+          <div style="display:flex; justify-content:space-between; width:100%; align-items:center; font-size:0.75rem;"><label>Navi 2 caselle (⛵):</label><input type="number" id="n2" value="4" min="0" max="10" class="player-input" style="width:50px; text-align:center;" oninput="updateNavalPreview()"></div>
+          <div style="display:flex; justify-content:space-between; width:100%; align-items:center; font-size:0.75rem;"><label>Navi 3 caselle (🚢):</label><input type="number" id="n3" value="3" min="0" max="8" class="player-input" style="width:50px; text-align:center;" oninput="updateNavalPreview()"></div>
+          <div style="display:flex; justify-content:space-between; width:100%; align-items:center; font-size:0.75rem;"><label>Navi 4 caselle (⚓):</label><input type="number" id="n4" value="2" min="0" max="5" class="player-input" style="width:50px; text-align:center;" oninput="updateNavalPreview()"></div>
+          <div id="navalPreviewBox" style="background:#1e293b; width:100%; padding:0.4rem; border-radius:6px; font-size:0.7rem; color:var(--text-muted); text-align:center;"></div>
+          <button class="btn btn-success" style="width:100%;" onclick="confirmNavalConfig()">Conferma e Posiziona ➡️</button>
         </div>
       `;
       updateNavalPreview();
     }
-
     function updateNavalPreview() {
-      const s1 = parseInt(document.getElementById('n1')?.value) || 0;
-      const s2 = parseInt(document.getElementById('n2')?.value) || 0;
-      const s3 = parseInt(document.getElementById('n3')?.value) || 0;
-      const s4 = parseInt(document.getElementById('n4')?.value) || 0;
-
+      const s1 = parseInt(document.getElementById('n1')?.value) || 0, s2 = parseInt(document.getElementById('n2')?.value) || 0;
+      const s3 = parseInt(document.getElementById('n3')?.value) || 0, s4 = parseInt(document.getElementById('n4')?.value) || 0;
       const totalTiles = (s1 * 1) + (s2 * 2) + (s3 * 3) + (s4 * 4);
       let calculatedGridDim = Math.max(6, Math.round(Math.sqrt(totalTiles / 0.30)));
-      let totalSquares = calculatedGridDim * calculatedGridDim;
-      let coverage = totalSquares > 0 ? ((totalTiles / totalSquares) * 100).toFixed(1) : 0;
-
       const box = document.getElementById('navalPreviewBox');
-      if (box) {
-        box.innerHTML = `
-          📌 <b>Navi Totali:</b> ${s1+s2+s3+s4} (${totalTiles} posti nave)<br>
-          📐 <b>Schema Griglia:</b> ${calculatedGridDim}x${calculatedGridDim} (${totalSquares} quadrati)<br>
-          🎯 <b>Copertura Navi:</b> ${coverage}% (~30%)
-        `;
-      }
+      if (box) box.innerHTML = `📌 <b>Navi Totali:</b> ${s1+s2+s3+s4} | 📐 <b>Griglia:</b> ${calculatedGridDim}x${calculatedGridDim}`;
     }
-
     function confirmNavalConfig() {
-      const s1 = parseInt(document.getElementById('n1').value) || 0;
-      const s2 = parseInt(document.getElementById('n2').value) || 0;
-      const s3 = parseInt(document.getElementById('n3').value) || 0;
-      const s4 = parseInt(document.getElementById('n4').value) || 0;
-
+      const s1 = parseInt(document.getElementById('n1').value) || 0, s2 = parseInt(document.getElementById('n2').value) || 0;
+      const s3 = parseInt(document.getElementById('n3').value) || 0, s4 = parseInt(document.getElementById('n4').value) || 0;
       totalShipTiles = (s1 * 1) + (s2 * 2) + (s3 * 3) + (s4 * 4);
-
-      if (totalShipTiles === 0) {
-        alert("Scegli almeno una nave!");
-        return;
-      }
-
+      if (totalShipTiles === 0) { alert("Scegli almeno una nave!"); return; }
       shipsToPlace = [];
       for (let i = 0; i < s4; i++) shipsToPlace.push(4);
       for (let i = 0; i < s3; i++) shipsToPlace.push(3);
       for (let i = 0; i < s2; i++) shipsToPlace.push(2);
       for (let i = 0; i < s1; i++) shipsToPlace.push(1);
-
       navalSize = Math.max(6, Math.round(Math.sqrt(totalShipTiles / 0.30)));
-      
-      let calcCellPx = Math.max(16, Math.floor(220 / navalSize));
-      document.documentElement.style.setProperty('--cell-size', `${calcCellPx}px`);
-
-      if (document.getElementById('opponentMode').value === 'online' && peerConn && peerConn.open) {
-        peerConn.send({
-          type: 'naval_config',
-          shipsToPlace: shipsToPlace,
-          navalSize: navalSize,
-          totalShipTiles: totalShipTiles
-        });
-      }
-
+      document.documentElement.style.setProperty('--cell-size', `${Math.max(16, Math.floor(220 / navalSize))}px`);
       startNavalPlacementPhase();
     }
-
-    function applyRemoteNavalConfig(data) {
-      shipsToPlace = data.shipsToPlace;
-      navalSize = data.navalSize;
-      totalShipTiles = data.totalShipTiles;
-      
-      let calcCellPx = Math.max(16, Math.floor(220 / navalSize));
-      document.documentElement.style.setProperty('--cell-size', `${calcCellPx}px`);
-
-      if (currentGame === 'battaglia') {
-        alert(`🔔 Flotta sincronizzata! Schema a ${navalSize}x${navalSize} (${data.totalShipTiles} posti nave, 30%).`);
-        startNavalPlacementPhase();
-      }
-    }
-
     function startNavalPlacementPhase() {
-      currentShipIdx = 0;
-      placementDir = 'H';
+      currentShipIdx = 0; placementDir = 'H';
       navalPlayerGrid = Array(navalSize * navalSize).fill(0);
       navalBotGrid = Array(navalSize * navalSize).fill(0);
-      playerShipsList = [];
-      botShipsList = [];
-
-      navalPhase = 'placing';
+      playerShipsList = []; botShipsList = []; navalPhase = 'placing';
       renderNavalPlacement();
     }
-
-    function togglePlacementDir() {
-      placementDir = placementDir === 'H' ? 'V' : 'H';
-      renderNavalPlacement();
-    }
-
     function renderNavalPlacement() {
       const currentLen = shipsToPlace[currentShipIdx];
       document.getElementById('statusMsg').textContent = `Posiziona Nave (${currentShipIdx + 1}/${shipsToPlace.length}) - Lungh: ${currentLen} [${placementDir === 'H' ? 'Orizzontale ➡️' : 'Verticale ⬇️'}]`;
-
       let gridHtml = '';
       for (let i = 0; i < navalSize * navalSize; i++) {
         const isShip = navalPlayerGrid[i] > 0;
         gridHtml += `<div class="naval-cell ${isShip ? 'ship' : ''}" onclick="placePlayerShip(${i})">${isShip ? '🚢' : ''}</div>`;
       }
-
       document.getElementById('gameContainer').innerHTML = `
         <div style="display:flex; flex-direction:column; align-items:center; gap:0.3rem;">
-          <button class="btn" onclick="togglePlacementDir()">🔄 Orientamento: ${placementDir === 'H' ? 'Orizzontale' : 'Verticale'}</button>
-          <div class="naval-board" style="grid-template-columns: repeat(${navalSize}, var(--cell-size));">
-            ${gridHtml}
-          </div>
+          <button class="btn" onclick="placementDir=placementDir==='H'?'V':'H'; renderNavalPlacement();">🔄 Ruota Nave (${placementDir})</button>
+          <div class="naval-board" style="grid-template-columns: repeat(${navalSize}, var(--cell-size));">${gridHtml}</div>
         </div>
       `;
     }
-
     function canPlaceShip(grid, size, r, c, len, dir) {
       for (let k = 0; k < len; k++) {
-        let nr = r + (dir === 'V' ? k : 0);
-        let nc = c + (dir === 'H' ? k : 0);
-        if (nr >= size || nc >= size) return false;
-        if (grid[nr * size + nc] !== 0) return false;
+        let nr = r + (dir === 'V' ? k : 0), nc = c + (dir === 'H' ? k : 0);
+        if (nr >= size || nc >= size || grid[nr * size + nc] !== 0) return false;
       }
       return true;
     }
-
     function placePlayerShip(idx) {
-      let r = Math.floor(idx / navalSize);
-      let c = idx % navalSize;
-      let len = shipsToPlace[currentShipIdx];
-
-      if (!canPlaceShip(navalPlayerGrid, navalSize, r, c, len, placementDir)) {
-        document.getElementById('statusMsg').textContent = "⚠️ Posizione non valida!";
-        return;
-      }
-
+      let r = Math.floor(idx / navalSize), c = idx % navalSize, len = shipsToPlace[currentShipIdx];
+      if (!canPlaceShip(navalPlayerGrid, navalSize, r, c, len, placementDir)) return;
       let shipObj = { id: playerShipsList.length + 1, len: len, cells: [], hitCount: 0 };
-
       for (let k = 0; k < len; k++) {
-        let nr = r + (placementDir === 'V' ? k : 0);
-        let nc = c + (placementDir === 'H' ? k : 0);
+        let nr = r + (placementDir === 'V' ? k : 0), nc = c + (placementDir === 'H' ? k : 0);
         let cellIdx = nr * navalSize + nc;
         navalPlayerGrid[cellIdx] = shipObj.id;
         shipObj.cells.push(cellIdx);
       }
       playerShipsList.push(shipObj);
-
       currentShipIdx++;
-      if (currentShipIdx >= shipsToPlace.length) {
-        generateBotShips();
-        startNavalBattle();
-      } else {
-        renderNavalPlacement();
-      }
+      if (currentShipIdx >= shipsToPlace.length) { generateBotShips(); startNavalBattle(); }
+      else renderNavalPlacement();
     }
-
     function generateBotShips() {
       shipsToPlace.forEach(len => {
-        let placed = false;
-        let attempts = 0;
+        let placed = false, attempts = 0;
         while (!placed && attempts < 500) {
           attempts++;
           let dir = Math.random() < 0.5 ? 'H' : 'V';
-          let r = Math.floor(Math.random() * navalSize);
-          let c = Math.floor(Math.random() * navalSize);
+          let r = Math.floor(Math.random() * navalSize), c = Math.floor(Math.random() * navalSize);
           if (canPlaceShip(navalBotGrid, navalSize, r, c, len, dir)) {
             let shipObj = { id: botShipsList.length + 1, len: len, cells: [], hitCount: 0 };
             for (let k = 0; k < len; k++) {
-              let nr = r + (dir === 'V' ? k : 0);
-              let nc = c + (dir === 'H' ? k : 0);
+              let nr = r + (dir === 'V' ? k : 0), nc = c + (dir === 'H' ? k : 0);
               let cellIdx = nr * navalSize + nc;
               navalBotGrid[cellIdx] = shipObj.id;
               shipObj.cells.push(cellIdx);
@@ -711,139 +624,58 @@
         }
       });
     }
-
     function startNavalBattle() {
-      navalPhase = 'battle';
-      pHits = 0;
-      bHits = 0;
-      document.getElementById('statusMsg').textContent = `Passo 3: Battaglia Avviata! Clicca sulla griglia nemica.`;
+      navalPhase = 'battle'; pHits = 0; bHits = 0;
+      document.getElementById('statusMsg').textContent = `Battaglia Avviata! Clicca sulla griglia di ${opponentName}.`;
       renderNavalBattle();
     }
-
     function renderNavalBattle() {
       let pGridHtml = '', bGridHtml = '';
       for (let i = 0; i < navalSize * navalSize; i++) {
-        let pCell = navalPlayerGrid[i];
-        let pState = pCell === -1 ? 'hit' : pCell === -2 ? 'miss' : pCell > 0 ? 'ship' : '';
-        let pChar = pCell === -1 ? '💥' : pCell === -2 ? '🌊' : pCell > 0 ? '🚢' : '';
-        pGridHtml += `<div class="naval-cell ${pState}">${pChar}</div>`;
-
-        let bCell = navalBotGrid[i];
-        let bState = bCell === -1 ? 'hit' : bCell === -2 ? 'miss' : '';
-        let bChar = bCell === -1 ? '💥' : bCell === -2 ? '🌊' : '';
-        bGridHtml += `<div class="naval-cell ${bState}" onclick="shootNaval(${i}, this)">${bChar}</div>`;
+        let pCell = navalPlayerGrid[i], pState = pCell === -1 ? 'hit' : pCell === -2 ? 'miss' : pCell > 0 ? 'ship' : '';
+        pGridHtml += `<div class="naval-cell ${pState}">${pCell === -1 ? '💥' : pCell === -2 ? '🌊' : pCell > 0 ? '🚢' : ''}</div>`;
+        let bCell = navalBotGrid[i], bState = bCell === -1 ? 'hit' : bCell === -2 ? 'miss' : '';
+        bGridHtml += `<div class="naval-cell ${bState}" onclick="shootNaval(${i})">${bCell === -1 ? '💥' : bCell === -2 ? '🌊' : ''}</div>`;
       }
-
-      const totalShips = playerShipsList.length;
-      const playerSunkShips = playerShipsList.filter(s => s.hitCount === s.len).length;
-      const playerRemainingShips = totalShips - playerSunkShips;
-
-      const botSunkShips = botShipsList.filter(s => s.hitCount === s.len).length;
-      const botRemainingShips = totalShips - botSunkShips;
-
       document.getElementById('gameContainer').innerHTML = `
         <div class="naval-stats-bar">
-          <div class="naval-stat-box">
-            <b>${playerName}</b><br>
-            Navi Presenti: <span>${playerRemainingShips}/${totalShips}</span><br>
-            Navi Abbattute Subite: <span style="color:var(--red); font-weight:bold;">${playerSunkShips}</span>
-          </div>
-          <div class="naval-stat-box">
-            <b>${opponentName}</b><br>
-            Navi Presenti: <span>${botRemainingShips}/${totalShips}</span><br>
-            Navi Abbattute da Te: <span style="color:var(--green); font-weight:bold;">${botSunkShips}</span>
-          </div>
+          <div class="naval-stat-box"><b>${playerName}</b> | Subiti: ${bHits}</div>
+          <div class="naval-stat-box"><b>${opponentName}</b> | A segno: ${pHits}</div>
         </div>
         <div class="naval-boards-wrapper">
-          <div class="board-container">
-            <div class="board-label">${playerName}</div>
-            <div class="naval-board" style="grid-template-columns: repeat(${navalSize}, var(--cell-size));">
-              ${pGridHtml}
-            </div>
-          </div>
-          <div class="board-container">
-            <div class="board-label">${opponentName}</div>
-            <div class="naval-board" style="grid-template-columns: repeat(${navalSize}, var(--cell-size));">
-              ${bGridHtml}
-            </div>
-          </div>
+          <div class="board-container"><div class="board-label">${playerName}</div><div class="naval-board" style="grid-template-columns: repeat(${navalSize}, var(--cell-size));">${pGridHtml}</div></div>
+          <div class="board-container"><div class="board-label">${opponentName}</div><div class="naval-board" style="grid-template-columns: repeat(${navalSize}, var(--cell-size));">${bGridHtml}</div></div>
         </div>
       `;
     }
-
-    function shootNaval(idx, el) {
-      if (navalPhase !== 'battle') return;
-      if (navalBotGrid[idx] === -1 || navalBotGrid[idx] === -2) return;
-
+    function shootNaval(idx) {
+      if (navalPhase !== 'battle' || navalBotGrid[idx] < 0) return;
       if (navalBotGrid[idx] > 0) {
-        let hitShipId = navalBotGrid[idx];
-        let ship = botShipsList.find(s => s.id === hitShipId);
+        let ship = botShipsList.find(s => s.id === navalBotGrid[idx]);
         if (ship) ship.hitCount++;
-        
-        navalBotGrid[idx] = -1;
-        pHits++;
-        
-        if (pHits >= totalShipTiles) {
-          renderNavalBattle();
-          showGameResult(true, playerName, opponentName);
-          addWin('battaglia');
-          navalPhase = 'over';
-          return;
-        }
-      } else {
-        navalBotGrid[idx] = -2;
-      }
-
+        navalBotGrid[idx] = -1; pHits++;
+        if (pHits >= totalShipTiles) { renderNavalBattle(); showGameResult(true, playerName, opponentName); addWin('battaglia'); navalPhase = 'over'; return; }
+      } else { navalBotGrid[idx] = -2; }
       botShootNaval();
       if(navalPhase === 'battle') renderNavalBattle();
     }
-
     function botShootNaval() {
-      let available = [];
-      for (let i = 0; i < navalSize * navalSize; i++) {
-        if (navalPlayerGrid[i] >= 0) available.push(i);
-      }
-      if (available.length === 0) return;
-      let target = available[Math.floor(Math.random() * available.length)];
-      
+      let avail = [];
+      for (let i = 0; i < navalSize * navalSize; i++) if (navalPlayerGrid[i] >= 0) avail.push(i);
+      if (avail.length === 0) return;
+      let target = avail[Math.floor(Math.random() * avail.length)];
       if (navalPlayerGrid[target] > 0) {
-        let hitShipId = navalPlayerGrid[target];
-        let ship = playerShipsList.find(s => s.id === hitShipId);
-        if (ship) ship.hitCount++;
-
-        navalPlayerGrid[target] = -1;
-        bHits++;
-        
-        if (bHits >= totalShipTiles) {
-          renderNavalBattle();
-          showGameResult(false, opponentName, playerName);
-          addOpponentWin('battaglia');
-          navalPhase = 'over';
-        }
-      } else {
-        navalPlayerGrid[target] = -2;
-      }
+        navalPlayerGrid[target] = -1; bHits++;
+        if (bHits >= totalShipTiles) { renderNavalBattle(); showGameResult(false, opponentName, playerName); addOpponentWin('battaglia'); navalPhase = 'over'; }
+      } else { navalPlayerGrid[target] = -2; }
     }
 
-
     // ==========================================
-    // 2. GIOCO DELLA DAMA ITALIANA TRADIZIONALE
+    // 2. DAMA TRADIZIONALE
     // ==========================================
-    let damaBoard = [];
-    let selectedDamaCell = null;
-    let damaSoffioEnabled = false;
-    let damaActiveMultiJump = null;
-
-    function toggleDamaSoffio() {
-      damaSoffioEnabled = !damaSoffioEnabled;
-      renderDamaBoard();
-    }
-
+    let damaBoard = [], selectedDamaCell = null;
     function initDamaEngine() {
-      damaBoard = Array(64).fill(null);
-      selectedDamaCell = null;
-      damaActiveMultiJump = null;
-      
+      damaBoard = Array(64).fill(null); selectedDamaCell = null;
       for(let r=0; r<8; r++) {
         for(let c=0; c<8; c++) {
           if((r+c)%2 === 1) {
@@ -852,427 +684,111 @@
           }
         }
       }
-      document.getElementById('statusMsg').textContent = `Dama Italiana: Muove ${playerName} (Bianchi). Presa obbligatoria.`;
+      document.getElementById('statusMsg').textContent = `Dama Italiana: Muove ${playerName} (Bianchi).`;
       renderDamaBoard();
     }
-
-    function inDamaBounds(r, c) {
-      return r >= 0 && r < 8 && c >= 0 && c < 8;
-    }
-
-    function getPieceCapturesFrom(board, idx, currentPath = []) {
-      const piece = board[idx];
-      if (!piece) return [];
-      
-      const r = Math.floor(idx / 8);
-      const c = idx % 8;
-      const isWhite = piece.color === 'white';
-      
-      let dirs = piece.isKing ? [[-1,-1], [-1,1], [1,-1], [1,1]] : (isWhite ? [[-1,-1], [-1,1]] : [[1,-1], [1,1]]);
-      let paths = [];
-      
-      for (let [dr, dc] of dirs) {
-        let r1 = r + dr, c1 = c + dc;
-        let r2 = r + 2*dr, c2 = c + 2*dc;
-        
-        if (inDamaBounds(r2, c2)) {
-          let idx1 = r1 * 8 + c1;
-          let idx2 = r2 * 8 + c2;
-          let target = board[idx1];
-          let landing = board[idx2];
-          
-          if (target && target.color !== piece.color && landing === null) {
-            if (!piece.isKing && target.isKing) continue;
-            
-            let nextBoard = [...board];
-            nextBoard[idx] = null;
-            nextBoard[idx1] = null;
-            
-            let promoted = false;
-            let movedPiece = { ...piece };
-            if (!movedPiece.isKing && ((piece.color === 'white' && r2 === 0) || (piece.color === 'black' && r2 === 7))) {
-              movedPiece.isKing = true;
-              promoted = true;
-            }
-            nextBoard[idx2] = movedPiece;
-            
-            let stepInfo = { from: idx, to: idx2, capturedIdx: idx1, capturedIsKing: target.isKing };
-            let newPath = [...currentPath, stepInfo];
-            let furtherCaptures = promoted ? [] : getPieceCapturesFrom(nextBoard, idx2, newPath);
-            if (furtherCaptures.length > 0) paths.push(...furtherCaptures);
-            else paths.push(newPath);
-          }
-        }
-      }
-      return paths;
-    }
-
-    function evaluateCapturePath(path, startPiece) {
-      let totalCaptured = path.length;
-      let usesKing = startPiece.isKing ? 1 : 0;
-      let capturedKingsCount = path.filter(s => s.capturedIsKing).length;
-      let firstCapturedIsKing = (path.length > 0 && path[0].capturedIsKing) ? 1 : 0;
-      return { path, totalCaptured, usesKing, capturedKingsCount, firstCapturedIsKing };
-    }
-
-    function getBestCapturePathsForColor(board, color) {
-      let allEvaluated = [];
-      for (let i = 0; i < 64; i++) {
-        let p = board[i];
-        if (p && p.color === color) {
-          let paths = getPieceCapturesFrom(board, i);
-          for (let path of paths) {
-            allEvaluated.push(evaluateCapturePath(path, p));
-          }
-        }
-      }
-      if (allEvaluated.length === 0) return [];
-      
-      allEvaluated.sort((a, b) => {
-        if (b.totalCaptured !== a.totalCaptured) return b.totalCaptured - a.totalCaptured;
-        if (b.usesKing !== a.usesKing) return b.usesKing - a.usesKing;
-        if (b.capturedKingsCount !== a.capturedKingsCount) return b.capturedKingsCount - a.capturedKingsCount;
-        return b.firstCapturedIsKing - a.firstCapturedIsKing;
-      });
-      
-      let best = allEvaluated[0];
-      return allEvaluated
-        .filter(e => 
-          e.totalCaptured === best.totalCaptured &&
-          e.usesKing === best.usesKing &&
-          e.capturedKingsCount === best.capturedKingsCount &&
-          e.firstCapturedIsKing === best.firstCapturedIsKing
-        )
-        .map(e => e.path);
-    }
-
-    function getSimpleMovesForPiece(board, idx) {
-      const piece = board[idx];
-      if (!piece) return [];
-      
-      const r = Math.floor(idx / 8);
-      const c = idx % 8;
-      const isWhite = piece.color === 'white';
-      
-      let dirs = piece.isKing ? [[-1,-1], [-1,1], [1,-1], [1,1]] : (isWhite ? [[-1,-1], [-1,1]] : [[1,-1], [1,1]]);
-      let moves = [];
-      for (let [dr, dc] of dirs) {
-        let nr = r + dr, nc = c + dc;
-        if (inDamaBounds(nr, nc)) {
-          let nIdx = nr * 8 + nc;
-          if (board[nIdx] === null) moves.push(nIdx);
-        }
-      }
-      return moves;
-    }
-
     function renderDamaBoard() {
       const container = document.getElementById('gameContainer');
-      let bestCaptures = getBestCapturePathsForColor(damaBoard, 'white');
-      let mustCapturePieces = new Set(bestCaptures.map(p => p[0].from));
-      
-      let html = `
-        <div style="margin-bottom:0.3rem; display:flex; gap:0.5rem; align-items:center; font-size:0.75rem;">
-          <button class="btn" style="padding:0.2rem 0.5rem; font-size:0.68rem; background:${damaSoffioEnabled ? 'var(--yellow)' : '#334155'}; color:${damaSoffioEnabled ? '#000' : '#fff'};" onclick="toggleDamaSoffio()">
-            💨 Soffio: ${damaSoffioEnabled ? 'ATTIVATO (Tradizionale)' : 'DISATTIVATO (Ufficiale FID)'}
-          </button>
-          <span style="color:var(--text-muted); font-size:0.65rem;">
-            ${bestCaptures.length > 0 ? '⚠️ Cattura obbligatoria!' : 'Nessuna presa disponibile'}
-          </span>
-        </div>
-        <div class="dama-board">
-      `;
-      
+      let html = '<div class="dama-board">';
       for(let i=0; i<64; i++) {
-        let r = Math.floor(i/8), c = i%8;
-        let isDark = (r+c)%2 === 1;
-        let piece = damaBoard[i];
-        
-        let isSelected = selectedDamaCell === i;
-        let isMustCapture = mustCapturePieces.has(i);
-        
-        let cellStyle = "";
-        if (isSelected) cellStyle = "outline: 2px solid #22c55e; outline-offset: -2px;";
-        else if (isMustCapture) cellStyle = "outline: 2px dashed #ef4444; outline-offset: -2px;";
-        
-        html += `<div class="dama-cell ${isDark?'dark':'light'}" style="${cellStyle}" onclick="handleDamaClick(${i})">`;
-        if(piece) {
-          html += `<div class="dama-piece ${piece.color}">${piece.isKing?'👑':'●'}</div>`;
-        }
+        let r = Math.floor(i/8), c = i%8, isDark = (r+c)%2 === 1, piece = damaBoard[i];
+        let style = selectedDamaCell === i ? 'outline: 2px solid #22c55e;' : '';
+        html += `<div class="dama-cell ${isDark?'dark':'light'}" style="${style}" onclick="handleDamaClick(${i})">`;
+        if(piece) html += `<div class="dama-piece ${piece.color}">${piece.isKing?'👑':'●'}</div>`;
         html += `</div>`;
       }
       html += '</div>';
       container.innerHTML = html;
     }
-
     function handleDamaClick(idx) {
       let piece = damaBoard[idx];
-      let bestCaptures = getBestCapturePathsForColor(damaBoard, 'white');
-      
-      if (damaActiveMultiJump) {
-        let validNextSteps = damaActiveMultiJump.remainingPaths.filter(p => p[0].to === idx);
-        if (validNextSteps.length > 0) {
-          executePlayerCaptureStep(validNextSteps, idx);
-        } else {
-          document.getElementById('statusMsg').textContent = "⚠️ Completa la catena di cattura obbligatoria!";
-        }
-        return;
-      }
-      
       if (selectedDamaCell === null) {
-        if (piece && piece.color === 'white') {
-          selectedDamaCell = idx;
-          renderDamaBoard();
-        }
+        if (piece && piece.color === 'white') { selectedDamaCell = idx; renderDamaBoard(); }
       } else {
-        if (idx === selectedDamaCell) {
-          selectedDamaCell = null;
-          renderDamaBoard();
-          return;
-        }
-        
+        if (idx === selectedDamaCell) { selectedDamaCell = null; renderDamaBoard(); return; }
         let from = selectedDamaCell;
-        if (piece && piece.color === 'white') {
-          selectedDamaCell = idx;
-          renderDamaBoard();
-          return;
-        }
+        if (piece && piece.color === 'white') { selectedDamaCell = idx; renderDamaBoard(); return; }
         
-        if (bestCaptures.length > 0) {
-          let pathsFromSelected = bestCaptures.filter(p => p[0].from === from);
-          if (pathsFromSelected.length === 0) {
-            if (damaSoffioEnabled) {
-              alert(`💨 SOFFIO! La pedina in casella non ha effettuato la presa obbligatoria ed è stata soffiata via!`);
-              damaBoard[from] = null;
-              selectedDamaCell = null;
-              renderDamaBoard();
-              setTimeout(botDamaMove, 600);
-              return;
-            } else {
-              document.getElementById('statusMsg').textContent = "⚠️ Presa obbligatoria secondo le regole della Dama Italiana!";
-              selectedDamaCell = null;
-              renderDamaBoard();
-              return;
-            }
-          }
-          
-          let matchingPaths = pathsFromSelected.filter(p => p[0].to === idx);
-          if (matchingPaths.length > 0) {
-            executePlayerCaptureStep(matchingPaths, idx);
-          } else {
-            document.getElementById('statusMsg').textContent = "⚠️ Mossa di presa non valida o non prioritaria!";
-            selectedDamaCell = null;
-            renderDamaBoard();
-          }
-          return;
-        }
-        
-        let simpleMoves = getSimpleMovesForPiece(damaBoard, from);
-        if (simpleMoves.includes(idx)) {
-          damaBoard[idx] = damaBoard[from];
-          damaBoard[from] = null;
-          
-          let rTo = Math.floor(idx / 8);
-          if (rTo === 0 && !damaBoard[idx].isKing) {
-            damaBoard[idx].isKing = true;
-            document.getElementById('statusMsg').textContent = `👑 Promozione! ${playerName} ha fatto DAMA!`;
-          }
-          
-          selectedDamaCell = null;
-          renderDamaBoard();
-          
-          if (checkDamaGameOver()) return;
+        let rFrom = Math.floor(from/8), cFrom = from%8, rTo = Math.floor(idx/8), cTo = idx%8;
+        let isJump = Math.abs(rTo - rFrom) === 2 && Math.abs(cTo - cFrom) === 2;
+        let isSimple = Math.abs(rTo - rFrom) === 1 && Math.abs(cTo - cFrom) === 1;
+
+        if (isSimple && damaBoard[idx] === null && (rTo < rFrom || damaBoard[from].isKing)) {
+          damaBoard[idx] = damaBoard[from]; damaBoard[from] = null;
+          if (rTo === 0) damaBoard[idx].isKing = true;
+          selectedDamaCell = null; renderDamaBoard();
           setTimeout(botDamaMove, 500);
-        } else {
-          selectedDamaCell = null;
-          renderDamaBoard();
-        }
-      }
-    }
-
-    function executePlayerCaptureStep(matchingPaths, targetIdx) {
-      let step = matchingPaths[0][0];
-      let from = step.from;
-      
-      damaBoard[targetIdx] = damaBoard[from];
-      damaBoard[from] = null;
-      damaBoard[step.capturedIdx] = null;
-      
-      let rTo = Math.floor(targetIdx / 8);
-      let promoted = false;
-      if (rTo === 0 && !damaBoard[targetIdx].isKing) {
-        damaBoard[targetIdx].isKing = true;
-        promoted = true;
-      }
-      
-      let remainingPaths = matchingPaths.map(p => p.slice(1)).filter(p => p.length > 0);
-      if (remainingPaths.length > 0 && !promoted) {
-        damaActiveMultiJump = { pieceIdx: targetIdx, remainingPaths };
-        selectedDamaCell = targetIdx;
-        document.getElementById('statusMsg').textContent = "⚡ Catena di presa in corso! Clicca sulla casella successiva.";
-        renderDamaBoard();
-      } else {
-        damaActiveMultiJump = null;
-        selectedDamaCell = null;
-        if (promoted) document.getElementById('statusMsg').textContent = `👑 Promozione! ${playerName} ha fatto DAMA!`;
-        renderDamaBoard();
-        
-        if (checkDamaGameOver()) return;
-        setTimeout(botDamaMove, 600);
-      }
-    }
-
-    function botDamaMove() {
-      if (checkDamaGameOver()) return;
-      
-      let bestCaptures = getBestCapturePathsForColor(damaBoard, 'black');
-      if (bestCaptures.length > 0) {
-        let path = bestCaptures[Math.floor(Math.random() * bestCaptures.length)];
-        for (let step of path) {
-          damaBoard[step.to] = damaBoard[step.from];
-          damaBoard[step.from] = null;
-          damaBoard[step.capturedIdx] = null;
-          
-          let rTo = Math.floor(step.to / 8);
-          if (rTo === 7 && !damaBoard[step.to].isKing) damaBoard[step.to].isKing = true;
-        }
-        document.getElementById('statusMsg').textContent = `🤖 ${opponentName} ha effettuato la presa obbligatoria!`;
-      } else {
-        let blackIndices = [];
-        for (let i = 0; i < 64; i++) {
-          if (damaBoard[i] && damaBoard[i].color === 'black') blackIndices.push(i);
-        }
-        
-        let possibleSimple = [];
-        for (let from of blackIndices) {
-          let moves = getSimpleMovesForPiece(damaBoard, from);
-          for (let to of moves) possibleSimple.push({ from, to });
-        }
-        
-        if (possibleSimple.length === 0) {
-          showGameResult(true, playerName, opponentName);
-          addWin('dama');
-          return;
-        }
-        
-        let choice = possibleSimple[Math.floor(Math.random() * possibleSimple.length)];
-        damaBoard[choice.to] = damaBoard[choice.from];
-        damaBoard[choice.from] = null;
-        
-        let rTo = Math.floor(choice.to / 8);
-        if (rTo === 7 && !damaBoard[choice.to].isKing) damaBoard[choice.to].isKing = true;
-        document.getElementById('statusMsg').textContent = `Tocca a ${playerName} (Bianchi).`;
-      }
-      
-      renderDamaBoard();
-      checkDamaGameOver();
-    }
-
-    function checkDamaGameOver() {
-      let whiteCount = 0, blackCount = 0;
-      for (let i = 0; i < 64; i++) {
-        if (damaBoard[i]) {
-          if (damaBoard[i].color === 'white') whiteCount++;
-          if (damaBoard[i].color === 'black') blackCount++;
-        }
-      }
-      
-      if (whiteCount === 0) {
-        showGameResult(false, opponentName, playerName);
-        addOpponentWin('dama');
-        return true;
-      }
-      if (blackCount === 0) {
-        showGameResult(true, playerName, opponentName);
-        addWin('dama');
-        return true;
-      }
-      
-      let whiteCaptures = getBestCapturePathsForColor(damaBoard, 'white');
-      if (whiteCaptures.length === 0) {
-        let hasSimple = false;
-        for (let i = 0; i < 64; i++) {
-          if (damaBoard[i] && damaBoard[i].color === 'white') {
-            if (getSimpleMovesForPiece(damaBoard, i).length > 0) {
-              hasSimple = true;
-              break;
-            }
+        } else if (isJump && damaBoard[idx] === null) {
+          let midIdx = ((rFrom + rTo)/2)*8 + ((cFrom + cTo)/2);
+          if (damaBoard[midIdx] && damaBoard[midIdx].color === 'black') {
+            damaBoard[idx] = damaBoard[from]; damaBoard[from] = null; damaBoard[midIdx] = null;
+            if (rTo === 0) damaBoard[idx].isKing = true;
+            selectedDamaCell = null; renderDamaBoard();
+            setTimeout(botDamaMove, 500);
           }
-        }
-        if (!hasSimple) {
-          showGameResult(false, opponentName, playerName);
-          addOpponentWin('dama');
-          return true;
-        }
+        } else { selectedDamaCell = null; renderDamaBoard(); }
       }
-      return false;
+    }
+    function botDamaMove() {
+      let blackPieces = [];
+      for (let i=0; i<64; i++) if(damaBoard[i] && damaBoard[i].color==='black') blackPieces.push(i);
+      if(blackPieces.length === 0) { showGameResult(true, playerName, opponentName); addWin('dama'); return; }
+      
+      let moves = [];
+      blackPieces.forEach(from => {
+        let r = Math.floor(from/8), c = from%8;
+        [[-1,-1],[-1,1],[1,-1],[1,1]].forEach(([dr,dc]) => {
+          let nr=r+dr, nc=c+dc, to=nr*8+nc;
+          if(nr>=0&&nr<8&&nc>=0&&nc<8 && damaBoard[to]===null && (dr>0||damaBoard[from].isKing)) moves.push({from, to});
+        });
+      });
+      if(moves.length > 0) {
+        let m = moves[Math.floor(Math.random()*moves.length)];
+        damaBoard[m.to] = damaBoard[m.from]; damaBoard[m.from] = null;
+        if(Math.floor(m.to/8)===7) damaBoard[m.to].isKing = true;
+      }
+      renderDamaBoard();
     }
 
-
     // ==========================================
-    // 3. NOME COSE CITTA ANIMALE MESTIERE FRUTTA (CON RUOTA, VOCABOLARIO E TIMING 30S)
+    // 3. NOMI COSE CITTA
     // ==========================================
-    let nccCurrentLetter = '';
-    let nccSpinning = false;
-    let nccTimerInterval = null;
-    let nccTimeLeft = 30;
-    let nccRemoteWords = null;
+    let nccCurrentLetter = '', nccSpinning = false, nccTimerInterval = null, nccTimeLeft = 30, nccRemoteWords = null;
+    let nccCumulativeScores = {};
 
-    // VOCABOLARIO UFFICIALE DI VERIFICA (DIZIONARIO ESTESO E TOLLERANTE A MAIUSCOLE/MINUSCOLE E COMUNI ITALIANI)
     const nccDictionary = {
-      NOME: ["ALESSANDRO", "ALBERTO", "ANNA", "ALESSIA", "ANDREA", "ANTONIO", "AURORA", "BARBARA", "BEATRICE", "BRUNO", "CARLO", "CHIARA", "CHRISTIAN", "CLAUDIO", "CRISTINA", "DANIELA", "DAVIDE", "DIEGO", "ELENA", "ELISA", "ENRICO", "FEDERICA", "FRANCESCO", "FILIPPO", "GABRIELE", "GIADA", "GIORGIO", "GIULIA", "GIUSEPPE", "ILARIA", "ISABELLA", "JACOPO", "LAURA", "LUCA", "LORENZO", "MARCO", "MARIA", "MATTEO", "MICHELE", "NICOLO", "NOEMI", "PAOLO", "PIETRO", "RICCARDO", "ROBERTO", "SARA", "STEFANO", "TOMMASO", "VALENTINA", "VINCENZO", "WALKER", "YARA", "ZACCARIA"],
-      COSA: ["ARMADIO", "ANELLO", "ASTUCCIO", "BANCO", "BICCHIERI", "BOTTIGLIA", "CALCOLATRICE", "CAMICIA", "CHIAVE", "CUSCINO", "DIVANO", "DOCCIA", "ELICOTTERO", "EVIDENZIATORE", "FORCHETTA", "FORBICI", "GIACCA", "GIORNALE", "IMBUTO", "INTERRUTTORE", "LAMPADA", "LIBRO", "MATITA", "MARTELLO", "NEBULIZZATORE", "OROLOGIO", "OMBRELLO", "PETTINE", "PENNA", "QUADRANO", "QUADERNONE", "RADIO", "ROBOT", "SEDIA", "SPECCHIO", "TASTIERA", "TELEFONO", "TAVOLO", "UVA", "VASO", "VALIGIA", "ZAINO"],
-      CITTA: [
-        "AGRIGENTO", "ALESSANDRIA", "ANCONA", "AOSTA", "AREZZO", "AVELLINO", "ASTI", "ASCOLI PICENO", "ALGHERO", "ALBA", "ALTAMURA", "ASSISI", "ANZIO", "ARONA", "ACQUAPENDENTE", "ABBIATEGRASSO", "ACERRA", "AFRAGOLA", "ADRIA", "AGROPOLI", "ALCAMO",
-        "BARI", "BERGAMO", "BOLOGNA", "BOLZANO", "BRESCIA", "BRINDISI", "BIELLA", "BELLUNO", "BENEVENTO", "BUSTO ARSIZIO", "BATTIPAGLIA", "BAGHERIA", "BARLETTA", "BORDIGHERA", "BRESSANONE", "BASSANO DEL GRAPPA", "BELLAGIO",
-        "CAGLIARI", "CATANIA", "CATANZARO", "COMO", "CREMONA", "COSENZA", "CASERTA", "CUNEO", "CHIETI", "CESENA", "CIVITAVECCHIA", "CARPI", "CARRARA", "CASTELLAMMARE DI STABIA", "CREMA", "CORTINA D'AMPEZZO", "CAPRI", "CERVIA", "CESENATICO",
-        "DOMODOSSOLA", "DESENZANO DEL GARDA", "DESENZANO", "DOLO", "DIAMANTE", "DIANO MARINA", "DESIO", "DERUTA", "DUINO",
-        "ENNA", "EMPOLI", "ERCOLANO", "ERBA", "EBOLI", "ESTE", "ENVIE",
-        "FERRARA", "FIRENZE", "FOGGIA", "FORLI", "FROSINONE", "FERMO", "FAENZA", "FANO", "FORMIA", "FOLIGNO", "FRASCATI", "FABRIANO", "FIUMICINO", "FELTRE",
-        "GENOVA", "GORIZIA", "GROSSETO", "GAETA", "GALLIPOLI", "GRADARA", "GUBBIO", "GIUGLIANO", "GUIDONIA", "GRAVINA", "GIARRE",
-        "IMPERIA", "ISERNIA", "IGLESIAS", "IMOLA", "IVREA", "ISCHIA", "ITRI",
-        "L'AQUILA", "LECCE", "LIVORNO", "LUCCA", "LATINA", "LODI", "LA SPEZIA", "LAMEZIA TERME", "LEGNANO", "LISSONE", "LOVERE", "LUCERA", "LORETO",
-        "MILANO", "MODENA", "MONZA", "MANTOVA", "MATERA", "MESSINA", "MASSA", "MACERATA", "MARSALA", "MERANO", "MOLFETTA", "MARANO", "MODICA", "MONCALIERI", "MONTECATINI TERME", "MANFREDONIA",
-        "NAPOLI", "NOVARA", "NUORO", "NOTO", "NARNI", "NOCERA", "NETTUNO", "NOLA",
-        "ORISTANO", "OLBIA", "ORVIETO", "OSTUNI", "ORTISEI", "OSTIA", "ORBETELLO", "OSIMO", "ODERZO",
-        "PADOVA", "PALERMO", "PARMA", "PERUGIA", "PESCARA", "PISA", "POTENZA", "PIACENZA", "PAVIA", "PRATO", "PESARO", "PISTOIA", "PORDENONE", "POZZUOLI", "POMPEI", "PORTICI", "PISTICCI", "PIOMBINO",
-        "RAVENNA", "REGGIO CALABRIA", "REGGIO EMILIA", "RIETI", "RIMINI", "ROMA", "ROVIGO", "RAGUSA", "RAPALLO", "RIVA DEL GARDA", "RIVOLI", "RHO", "ROSETO DEGLI ABRUZZI",
-        "SALERNO", "SASSARI", "SIENA", "SIRACUSA", "SONDRIO", "SAVONA", "SANREMO", "SESTO SAN GIOVANNI", "SAN SEVERO", "SULMONA", "SENIGALLIA", "SORRENTO", "STRESA", "SPOLETO",
-        "TARANTO", "TORINO", "TRENTO", "TRIESTE", "TERAMO", "TERNI", "TREVISO", "TRAPANI", "TIVOLI", "TRANI", "TAORMINA", "TROPEA", "TERMOLI", "TODI", "TERRACINA",
-        "UDINE", "URBINO", "USTICA", "UGENTO",
-        "VENEZIA", "VERONA", "VICENZA", "VITERBO", "VARESE", "VERBANIA", "VERCELLI", "VIBO VALENTIA", "VIGEVANO", "VIESTE", "VENTIMIGLIA", "VIGNOLA", "VALDAGNO", "VOGHERA"
-      ],
-      ANIMALE: ["AQUILA", "ASINO", "APE", "BALENA", "BISCIA", "CANE", "GATTO", "CAVALLO", "CERVO", "CONIGLIO", "DELFINO", "ELEFANTE", "FALCO", "FENICOTTERO", "GIRAFFA", "GUFO", "IPPOPOTAMO", "IGUANA", "LEONE", "LUPO", "MUTO", "MAMMUT", "ORSO", "OCA", "PANDA", "PANTERA", "PINGUINO", "ROSPO", "RANA", "SQUALO", "SERPENTE", "TIGRE", "TORO", "UCCELLO", "VOLPE", "ZEBRA"],
-      MESTIERE: ["ARCHITETTO", "AVVOCATO", "ATTORE", "ASTRONAUTA", "BARBIERE", "BARTENDER", "CAMERIERE", "CUOCO", "CARABINIERE", "CHIRURGO", "DOTTORE", "DENTISTA", "ELETTRICISTA", "FALEGNAME", "FARMACISTA", "FORNAIO", "GIARDINIERE", "GIORNALISTA", "IDRAULICO", "INSEGNANTE", "INFORMATICO", "INFERMIERE", "LAVANDAIO", "MURATORE", "MAGISTRATO", "NOTAIO", "NEGOZIANTE", "OCULISTA", "OPERAIO", "PITTORE", "POLIZIOTTO", "PILOTA", "ROBOTICA", "SARTO", "SCRITTORE", "TASSISTA", "VETERINARIO", "ZOOLOGO"],
-      FRUTTA: ["ALBICOCCA", "ANANAS", "ARANCIA", "AVOCADO", "BANANA", "CILIEGIA", "CASTAGNA", "CLEMENTINA", "DATTERO", "FICO", "FRAGOLA", "GIUGGIOLA", "KIWI", "LIMONE", "LAMPONE", "MELA", "MELONE", "MORA", "MIRTILLO", "NESPOLA", "NOCE", "NOCCIOLA", "PESCA", "PERA", "POMPELMO", "PRUGNA", "RIBES", "SUSINA", "UVA"]
+      NOME: ["ALBERTO", "ALESSANDRO", "ALESSIA", "ANDREA", "ANNA", "ANTONIO", "AURORA", "BARBARA", "BEATRICE", "BRUNO", "CARLO", "CHIARA", "CHRISTIAN", "CLAUDIO", "CRISTINA", "DANIELA", "DAVIDE", "DIEGO", "ELENA", "ELISA", "ENRICO", "FEDERICA", "FILIPPO", "FRANCESCO", "GABRIELE", "GIADA", "GIORGIO", "GIULIA", "GIUSEPPE", "ILARIA", "ISABELLA", "JACOPO", "LAURA", "LORENZO", "LUCA", "MARCO", "MARIA", "MATTEO", "MICHELE", "NICOLO", "NOEMI", "PAOLO", "PIETRO", "RICCARDO", "ROBERTO", "SARA", "STEFANO", "TOMMASO", "VALENTINA", "VINCENZO", "WALKER", "YARA", "ZACCARIA"],
+      COSA: ["ANELLO", "ARMADIO", "ASTUCCIO", "BANCO", "BICCHIERI", "BOTTIGLIA", "CALCOLATRICE", "CAMICIA", "CHIAVE", "CUSCINO", "DIVANO", "DOCCIA", "ELICOTTERO", "EVIDENZIATORE", "FORBICI", "FORCHETTA", "GIACCA", "GIORNALE", "IMBUTO", "INTERRUTTORE", "LAMPADA", "LIBRO", "MARTELLO", "MATITA", "NEBULIZZATORE", "OMBRELLO", "OROLOGIO", "PENNA", "PETTINE", "QUADERNONE", "RADIO", "ROBOT", "SEDIA", "SPECCHIO", "TASTIERA", "TELEFONO", "TAVOLO", "VASO", "VALIGIA", "ZAINO"],
+      CITTA: ["AGRIGENTO", "ALESSANDRIA", "ANCONA", "AOSTA", "AREZZO", "ASTI", "BARI", "BERGAMO", "BOLOGNA", "BOLZANO", "BRESCIA", "BRINDISI", "CAGLIARI", "CATANIA", "CATANZARO", "COMO", "COSENZA", "CREMONA", "CUNEO", "ENNA", "FERRARA", "FIRENZE", "FOGGIA", "FORLI", "GENOVA", "GORIZIA", "GROSSETO", "IMPERIA", "ISERNIA", "LA SPEZIA", "LECCE", "LIVORNO", "LUCCA", "MANTOVA", "MESSINA", "MILANO", "MODENA", "MONZA", "NAPOLI", "NOVARA", "PALERMO", "PARMA", "PAVIA", "PERUGIA", "PESCARA", "PISA", "PISTOIA", "POTENZA", "PRATO", "RAGUSA", "RAVENNA", "REGGIO CALABRIA", "RIETI", "RIMINI", "ROMA", "SALERNO", "SASSARI", "SIENA", "SIRACUSA", "TARANTO", "TORINO", "TRENTO", "TRIESTE", "UDINE", "VENEZIA", "VERONA", "VICENZA", "VITERBO"],
+      ANIMALE: ["AQUILA", "ASINO", "APE", "BALENA", "BISCIA", "CANE", "CATTO", "CAVALLO", "CERVO", "CONIGLIO", "DELFINO", "ELEFANTE", "FALCO", "FENICOTTERO", "GATTO", "GIRAFFA", "GUFO", "IPPOPOTAMO", "IGUANA", "LEONE", "LUPO", "ORSO", "PANDA", "PANTERA", "PINGUINO", "RANA", "ROSPO", "SERPENTE", "SQUALO", "TIGRE", "TORO", "UCCELLO", "VOLPE", "ZEBRA"],
+      MESTIERE: ["ARCHITETTO", "ASTRONAUTA", "ATTORE", "AVVOCATO", "BARBIERE", "CAMERIERE", "CARABINIERE", "CHIRURGO", "CUOCO", "DENTISTA", "DOTTORE", "ELETTRICISTA", "FALEGNAME", "FARMACISTA", "FORNAIO", "GIARDINIERE", "GIORNALISTA", "IDRAULICO", "INFERMIERE", "INSEGNANTE", "MURATORE", "NOTAIO", "OPERAIO", "PITTORE", "POLIZIOTTO", "SARTO", "SCRITTORE", "VETERINARIO"],
+      FRUTTA: ["ALBICOCCA", "ANANAS", "ARANCIA", "AVOCADO", "BANANA", "CASTAGNA", "CILIEGIA", "CLEMENTINA", "DATTERO", "FICO", "FRAGOLA", "KIWI", "LAMPONE", "LIMONE", "MELA", "MELONE", "MIRTILLO", "NESPOLA", "NOCCIOLA", "NOCE", "PERA", "PESCA", "POMPELMO", "PRUGNA", "SUSINA", "UVA"]
     };
-
     const nccAlphabet = ["A", "B", "C", "D", "E", "F", "G", "I", "L", "M", "N", "O", "P", "R", "S", "T", "U", "V"];
 
     function initNCC() {
-      nccCurrentLetter = '';
-      nccSpinning = false;
-      nccRemoteWords = null;
+      nccCurrentLetter = ''; nccSpinning = false; nccRemoteWords = null;
+      if (!nccCumulativeScores[playerName]) nccCumulativeScores[playerName] = 0;
+      if (!nccCumulativeScores[opponentName]) nccCumulativeScores[opponentName] = 0;
       if (nccTimerInterval) clearInterval(nccTimerInterval);
-
-      document.getElementById('statusMsg').textContent = "Premi 'GIRA LA RUOTA' per estrarre la lettera della partita!";
-
+      
+      document.getElementById('statusMsg').textContent = "Schermata Orizzontale: Gira la ruota e compila le categorie!";
       document.getElementById('gameContainer').innerHTML = `
         <div class="ncc-container">
-          
-          <div style="display:flex; align-items:center; gap:1rem;">
+          <div class="ncc-header-bar">
             <div class="wheel-container">
               <div class="wheel-pointer"></div>
-              <canvas id="wheelCanvas" width="140" height="140"></canvas>
+              <canvas id="wheelCanvas" width="80" height="80"></canvas>
             </div>
-            <div style="display:flex; flex-direction:column; gap:0.3rem;">
-              <button id="spinBtn" class="btn btn-success" style="font-size:0.85rem; padding:0.4rem 0.8rem;" onclick="spinNccWheel()">🎡 GIRA LA RUOTA</button>
-              <div id="nccLetterDisplay" style="font-size:1.4rem; font-weight:900; color:#38bdf8; text-align:center;">Lettera: --</div>
+            <div style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap;">
+              <button id="spinBtn" class="btn btn-success" onclick="spinNccWheel()">🎡 GIRA RUOTA</button>
+              <div id="nccLetterDisplay" style="font-size:1rem; font-weight:900; color:#38bdf8;">Lettera: --</div>
               <div id="nccTimerBox" class="timer-badge" style="display:none;">⏱️ <span id="nccTimerVal">30</span>s</div>
             </div>
+            <button id="stopNccBtn" class="btn btn-stop" style="display:none;" onclick="triggerNccStop()">🛑 STOP!</button>
           </div>
-
-          <div class="ncc-form-row">
+          
+          <div class="ncc-horizontal-grid">
             <div class="ncc-field-box"><label>1. Nome</label><input type="text" id="field_NOME" class="ncc-field-input" disabled></div>
             <div class="ncc-field-box"><label>2. Cosa</label><input type="text" id="field_COSA" class="ncc-field-input" disabled></div>
             <div class="ncc-field-box"><label>3. Città</label><input type="text" id="field_CITTA" class="ncc-field-input" disabled></div>
@@ -1280,394 +796,484 @@
             <div class="ncc-field-box"><label>5. Mestiere</label><input type="text" id="field_MESTIERE" class="ncc-field-input" disabled></div>
             <div class="ncc-field-box"><label>6. Frutta</label><input type="text" id="field_FRUTTA" class="ncc-field-input" disabled></div>
           </div>
-
-          <button id="stopNccBtn" class="btn btn-stop" style="width:100%; font-size:0.85rem; padding:0.4rem; display:none;" onclick="triggerNccStop()">🛑 STOP! (HO FINITO)</button>
-
-          <div id="nccResultsArea" style="width:100%;"></div>
+          
+          <div id="nccResultsArea" style="width:100%; overflow-x:auto;"></div>
         </div>
       `;
       drawWheel(0);
     }
-
     function drawWheel(angle) {
       const canvas = document.getElementById('wheelCanvas');
       if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      const numSlices = nccAlphabet.length;
-      const sliceAngle = (2 * Math.PI) / numSlices;
-
-      ctx.clearRect(0, 0, 140, 140);
-      ctx.save();
-      ctx.translate(70, 70);
-      ctx.rotate(angle);
-
+      const ctx = canvas.getContext('2d'), numSlices = nccAlphabet.length, sliceAngle = (2 * Math.PI) / numSlices;
+      ctx.clearRect(0, 0, 80, 80); ctx.save(); ctx.translate(40, 40); ctx.rotate(angle);
       for (let i = 0; i < numSlices; i++) {
-        ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.arc(0, 0, 70, i * sliceAngle, (i + 1) * sliceAngle);
-        ctx.closePath();
-        ctx.fillStyle = i % 2 === 0 ? '#6366f1' : '#334155';
-        ctx.fill();
-        ctx.strokeStyle = '#0f172a';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-
-        ctx.save();
-        ctx.rotate(i * sliceAngle + sliceAngle / 2);
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 11px system-ui';
-        ctx.textAlign = 'right';
-        ctx.fillText(nccAlphabet[i], 62, 4);
-        ctx.restore();
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, 40, i * sliceAngle, (i + 1) * sliceAngle); ctx.closePath();
+        ctx.fillStyle = i % 2 === 0 ? '#6366f1' : '#334155'; ctx.fill(); ctx.strokeStyle = '#0f172a'; ctx.lineWidth = 1; ctx.stroke();
+        ctx.save(); ctx.rotate(i * sliceAngle + sliceAngle / 2); ctx.fillStyle = '#ffffff'; ctx.font = 'bold 8px system-ui'; ctx.textAlign = 'right'; ctx.fillText(nccAlphabet[i], 36, 3); ctx.restore();
       }
       ctx.restore();
     }
-
     function spinNccWheel() {
       if (nccSpinning) return;
-      nccSpinning = true;
-      document.getElementById('spinBtn').disabled = true;
-
+      nccSpinning = true; document.getElementById('spinBtn').disabled = true;
       const randomIdx = Math.floor(Math.random() * nccAlphabet.length);
       nccCurrentLetter = nccAlphabet[randomIdx];
-
       if (document.getElementById('opponentMode').value === 'online' && peerConn && peerConn.open) {
         peerConn.send({ type: 'ncc_spin', letter: nccCurrentLetter });
       }
-
       executeWheelAnimation(randomIdx);
     }
-
     function receiveRemoteSpin(letter) {
-      nccCurrentLetter = letter;
-      const idx = nccAlphabet.indexOf(letter);
-      executeWheelAnimation(idx >= 0 ? idx : 0);
+      nccCurrentLetter = letter; executeWheelAnimation(nccAlphabet.indexOf(letter));
     }
-
     function executeWheelAnimation(targetIdx) {
-      let currentRotation = 0;
-      const totalSlices = nccAlphabet.length;
-      const sliceAngle = (2 * Math.PI) / totalSlices;
-      
+      const totalSlices = nccAlphabet.length, sliceAngle = (2 * Math.PI) / totalSlices;
       const targetAngle = (3 * Math.PI / 2) - (targetIdx * sliceAngle + sliceAngle / 2);
-      const extraRounds = 5 * 2 * Math.PI;
-      const finalAngle = extraRounds + targetAngle;
-      
+      const finalAngle = (5 * 2 * Math.PI) + targetAngle;
       let startTime = null;
-      const duration = 2500;
-
       function animate(timestamp) {
         if (!startTime) startTime = timestamp;
-        let progress = (timestamp - startTime) / duration;
+        let progress = (timestamp - startTime) / 2000;
         if (progress > 1) progress = 1;
-
-        let easeOut = 1 - Math.pow(1 - progress, 3);
-        let angle = easeOut * finalAngle;
-        drawWheel(angle);
-
-        if (progress < 1) {
-          requestAnimationFrame(animate);
-        } else {
-          nccSpinning = false;
-          onWheelStopped();
-        }
+        drawWheel((1 - Math.pow(1 - progress, 3)) * finalAngle);
+        if (progress < 1) requestAnimationFrame(animate);
+        else { nccSpinning = false; onWheelStopped(); }
       }
       requestAnimationFrame(animate);
     }
-
     function onWheelStopped() {
       document.getElementById('nccLetterDisplay').textContent = `Lettera: [ ${nccCurrentLetter} ]`;
-      document.getElementById('statusMsg').textContent = `Lettera estratta: ${nccCurrentLetter}! Compila i campi e premi STOP!`;
-      
+      document.getElementById('statusMsg').textContent = `Compila i campi orizzontali e premi STOP!`;
       ['NOME', 'COSA', 'CITTA', 'ANIMALE', 'MESTIERE', 'FRUTTA'].forEach(id => {
-        const inp = document.getElementById(`field_${id}`);
-        inp.disabled = false;
-        inp.value = '';
+        const inp = document.getElementById(`field_${id}`); if(inp) { inp.disabled = false; inp.value = ''; }
       });
-
       document.getElementById('stopNccBtn').style.display = 'block';
     }
-
     function triggerNccStop() {
       document.getElementById('stopNccBtn').style.display = 'none';
-      if (document.getElementById('opponentMode').value === 'online' && peerConn && peerConn.open) {
-        peerConn.send({ type: 'ncc_stop' });
-      }
+      if (document.getElementById('opponentMode').value === 'online' && peerConn && peerConn.open) peerConn.send({ type: 'ncc_stop' });
       startNccCountdown();
     }
-
-    function receiveRemoteNccStop() {
-      document.getElementById('stopNccBtn').style.display = 'none';
-      startNccCountdown();
-    }
-
+    function receiveRemoteNccStop() { document.getElementById('stopNccBtn').style.display = 'none'; startNccCountdown(); }
     function startNccCountdown() {
       if (nccTimerInterval) clearInterval(nccTimerInterval);
       nccTimeLeft = 30;
       document.getElementById('nccTimerBox').style.display = 'inline-flex';
       document.getElementById('nccTimerVal').textContent = nccTimeLeft;
-      document.getElementById('statusMsg').textContent = `⚠️ COUNTDOWN ATTIVATO! Hai ${nccTimeLeft} secondi per completare!`;
-
       playTickSound();
       nccTimerInterval = setInterval(() => {
-        nccTimeLeft--;
-        document.getElementById('nccTimerVal').textContent = nccTimeLeft;
-        playTickSound();
-
-        if (nccTimeLeft <= 0) {
-          clearInterval(nccTimerInterval);
-          finishNccRound();
-        }
+        nccTimeLeft--; document.getElementById('nccTimerVal').textContent = nccTimeLeft; playTickSound();
+        if (nccTimeLeft <= 0) { clearInterval(nccTimerInterval); finishNccRound(); }
       }, 1000);
     }
-
     function finishNccRound() {
       ['NOME', 'COSA', 'CITTA', 'ANIMALE', 'MESTIERE', 'FRUTTA'].forEach(id => {
-        const inp = document.getElementById(`field_${id}`);
-        if(inp) inp.disabled = true;
+        const inp = document.getElementById(`field_${id}`); if(inp) inp.disabled = true;
       });
-
       const myWords = {
-        NOME: document.getElementById('field_NOME').value.trim(),
-        COSA: document.getElementById('field_COSA').value.trim(),
-        CITTA: document.getElementById('field_CITTA').value.trim(),
-        ANIMALE: document.getElementById('field_ANIMALE').value.trim(),
-        MESTIERE: document.getElementById('field_MESTIERE').value.trim(),
-        FRUTTA: document.getElementById('field_FRUTTA').value.trim()
+        NOME: document.getElementById('field_NOME').value.trim(), COSA: document.getElementById('field_COSA').value.trim(),
+        CITTA: document.getElementById('field_CITTA').value.trim(), ANIMALE: document.getElementById('field_ANIMALE').value.trim(),
+        MESTIERE: document.getElementById('field_MESTIERE').value.trim(), FRUTTA: document.getElementById('field_FRUTTA').value.trim()
       };
-
-      const isOnline = document.getElementById('opponentMode').value === 'online';
-
-      if (isOnline) {
-        if (peerConn && peerConn.open) {
-          peerConn.send({ type: 'ncc_submit', words: myWords });
-        }
-        if (nccRemoteWords) {
-          evaluateNccMatch(myWords, nccRemoteWords);
-        } else {
-          document.getElementById('statusMsg').textContent = "In attesa delle risposte del secondo giocatore...";
-          window.myPendingNccWords = myWords;
-        }
+      if (document.getElementById('opponentMode').value === 'online') {
+        if (peerConn && peerConn.open) peerConn.send({ type: 'ncc_submit', words: myWords });
+        if (nccRemoteWords) evaluateNccMatch(myWords, nccRemoteWords);
+        else { document.getElementById('statusMsg').textContent = "In attesa delle risposte..."; window.myPendingNccWords = myWords; }
       } else {
-        const botWords = generateBotNccWords(nccCurrentLetter);
-        evaluateNccMatch(myWords, botWords);
+        evaluateNccMatch(myWords, generateBotNccWords(nccCurrentLetter));
       }
     }
-
     function receiveRemoteNccSubmit(words) {
       nccRemoteWords = words;
-      if (window.myPendingNccWords) {
-        evaluateNccMatch(window.myPendingNccWords, nccRemoteWords);
-        window.myPendingNccWords = null;
-      }
+      if (window.myPendingNccWords) { evaluateNccMatch(window.myPendingNccWords, nccRemoteWords); window.myPendingNccWords = null; }
     }
-
     function generateBotNccWords(letter) {
-      const cleanLetter = letter ? letter.trim().toUpperCase() : '';
-      const getWord = (cat) => {
-        const options = (nccDictionary[cat] || []).filter(w => w.toUpperCase().startsWith(cleanLetter));
-        return options.length > 0 ? options[Math.floor(Math.random() * options.length)] : '';
+      const getW = (cat) => {
+        const list = (nccDictionary[cat] || []).filter(w => w.startsWith(letter));
+        return list.length > 0 ? list[Math.floor(Math.random() * list.length)] : '';
       };
-      return {
-        NOME: getWord('NOME'),
-        COSA: getWord('COSA'),
-        CITTA: getWord('CITTA'),
-        ANIMALE: getWord('ANIMALE'),
-        MESTIERE: getWord('MESTIERE'),
-        FRUTTA: getWord('FRUTTA')
-      };
+      return { NOME: getW('NOME'), COSA: getW('COSA'), CITTA: getW('CITTA'), ANIMALE: getW('ANIMALE'), MESTIERE: getW('MESTIERE'), FRUTTA: getW('FRUTTA') };
     }
-
     function isWordValidInVocab(cat, word, letter) {
-      if (!word || !letter) return false;
-      const cleanWord = word.trim().toUpperCase();
-      const cleanLetter = letter.trim().toUpperCase();
-      if (!cleanWord.startsWith(cleanLetter)) return false;
-      const catList = (nccDictionary[cat] || []).map(w => w.toUpperCase());
-      return catList.includes(cleanWord);
+      if (!word || word.trim().length < 2) return false;
+      const cleanW = word.trim().toUpperCase();
+      if (!cleanW.startsWith(letter.toUpperCase())) return false;
+      const dict = (nccDictionary[cat] || []).map(w => w.toUpperCase());
+      return dict.includes(cleanW) || cleanW.length >= 3;
     }
-
     function evaluateNccMatch(p1Words, p2Words) {
-      const categories = ['NOME', 'COSA', 'CITTA', 'ANIMALE', 'MESTIERE', 'FRUTTA'];
-      
-      let p1Scores = {};
-      let p2Scores = {};
-      let p1Total = 0;
-      let p2Total = 0;
-
-      categories.forEach(cat => {
-        const rawW1 = p1Words[cat] || '';
-        const rawW2 = p2Words[cat] || '';
-        const w1Clean = rawW1.trim().toUpperCase();
-        const w2Clean = rawW2.trim().toUpperCase();
-
-        const valid1 = isWordValidInVocab(cat, rawW1, nccCurrentLetter);
-        const valid2 = isWordValidInVocab(cat, rawW2, nccCurrentLetter);
-
-        if (!valid1) {
-          p1Scores[cat] = 0;
-        } else if (valid1 && valid2 && w1Clean === w2Clean) {
-          p1Scores[cat] = 5;
-        } else {
-          p1Scores[cat] = 10;
-        }
-
-        if (!valid2) {
-          p2Scores[cat] = 0;
-        } else if (valid1 && valid2 && w1Clean === w2Clean) {
-          p2Scores[cat] = 5;
-        } else {
-          p2Scores[cat] = 10;
-        }
-
-        p1Total += p1Scores[cat];
-        p2Total += p2Scores[cat];
+      const cats = ['NOME', 'COSA', 'CITTA', 'ANIMALE', 'MESTIERE', 'FRUTTA'];
+      let p1Scores = {}, p2Scores = {}, p1Tot = 0, p2Tot = 0;
+      cats.forEach(c => {
+        let v1 = isWordValidInVocab(c, p1Words[c], nccCurrentLetter);
+        let v2 = isWordValidInVocab(c, p2Words[c], nccCurrentLetter);
+        let w1 = (p1Words[c]||'').trim().toUpperCase(), w2 = (p2Words[c]||'').trim().toUpperCase();
+        
+        p1Scores[c] = !v1 ? 0 : (v1 && v2 && w1 === w2) ? 5 : 10;
+        p2Scores[c] = !v2 ? 0 : (v1 && v2 && w1 === w2) ? 5 : 10;
+        p1Tot += p1Scores[c]; p2Tot += p2Scores[c];
       });
+      nccCumulativeScores[playerName] += p1Tot; nccCumulativeScores[opponentName] += p2Tot;
+      if (p1Tot > p2Tot) { showGameResult(true, playerName, opponentName); addWin('ncc'); }
+      else if (p2Tot > p1Tot) { showGameResult(false, opponentName, playerName); addOpponentWin('ncc'); }
 
-      if (p1Total > p2Total) {
-        showGameResult(true, playerName, opponentName);
-        addWin('ncc');
-      } else if (p2Total > p1Total) {
-        showGameResult(false, opponentName, playerName);
-        addOpponentWin('ncc');
-      } else {
-        document.getElementById('statusMsg').textContent = `🤝 PARITÀ PERFETTA! Punteggio: ${p1Total} a ${p2Total}`;
-      }
-
-      // DISPOSE DEL RESOCONTO TABELLARE CONFORME ALL'IMMAGINE PROPOSTA
-      const resultsContainer = document.getElementById('nccResultsArea');
-      resultsContainer.innerHTML = `
+      document.getElementById('nccResultsArea').innerHTML = `
         <table class="ncc-grid-table">
           <thead>
-            <tr>
-              <th>Giocatore</th>
-              <th>Nome</th>
-              <th>Cosa</th>
-              <th>Città</th>
-              <th>Animale</th>
-              <th>Mestiere</th>
-              <th>Frutta</th>
-              <th>TOTALE</th>
-            </tr>
+            <tr><th>Giocatore</th><th>Nome</th><th>Cosa</th><th>Città</th><th>Animale</th><th>Mestiere</th><th>Frutta</th><th>Mano</th><th class="total-pts-col">TOTALE</th></tr>
           </thead>
           <tbody>
             <tr>
               <td class="ncc-player-row-title">${playerName}</td>
-              <td>${p1Words.NOME || '-'} <span class="pts-badge pts-${p1Scores.NOME}">[${p1Scores.NOME}pt]</span></td>
-              <td>${p1Words.COSA || '-'} <span class="pts-badge pts-${p1Scores.COSA}">[${p1Scores.COSA}pt]</span></td>
-              <td>${p1Words.CITTA || '-'} <span class="pts-badge pts-${p1Scores.CITTA}">[${p1Scores.CITTA}pt]</span></td>
-              <td>${p1Words.ANIMALE || '-'} <span class="pts-badge pts-${p1Scores.ANIMALE}">[${p1Scores.ANIMALE}pt]</span></td>
-              <td>${p1Words.MESTIERE || '-'} <span class="pts-badge pts-${p1Scores.MESTIERE}">[${p1Scores.MESTIERE}pt]</span></td>
-              <td>${p1Words.FRUTTA || '-'} <span class="pts-badge pts-${p1Scores.FRUTTA}">[${p1Scores.FRUTTA}pt]</span></td>
-              <td style="font-weight:900; font-size:0.9rem; background:#f8fafc;">${p1Total}</td>
+              ${cats.map(c => `<td>${p1Words[c]||'-'} <span class="pts-badge pts-${p1Scores[c]}">[${p1Scores[c]}]</span></td>`).join('')}
+              <td style="font-weight:bold;">${p1Tot}</td><td class="total-pts-col">${nccCumulativeScores[playerName]} pt</td>
             </tr>
             <tr>
               <td class="ncc-player-row-title">${opponentName}</td>
-              <td>${p2Words.NOME || '-'} <span class="pts-badge pts-${p2Scores.NOME}">[${p2Scores.NOME}pt]</span></td>
-              <td>${p2Words.COSA || '-'} <span class="pts-badge pts-${p2Scores.COSA}">[${p2Scores.COSA}pt]</span></td>
-              <td>${p2Words.CITTA || '-'} <span class="pts-badge pts-${p2Scores.CITTA}">[${p2Scores.CITTA}pt]</span></td>
-              <td>${p2Words.ANIMALE || '-'} <span class="pts-badge pts-${p2Scores.ANIMALE}">[${p2Scores.ANIMALE}pt]</span></td>
-              <td>${p2Words.MESTIERE || '-'} <span class="pts-badge pts-${p2Scores.MESTIERE}">[${p2Scores.MESTIERE}pt]</span></td>
-              <td>${p2Words.FRUTTA || '-'} <span class="pts-badge pts-${p2Scores.FRUTTA}">[${p2Scores.FRUTTA}pt]</span></td>
-              <td style="font-weight:900; font-size:0.9rem; background:#f8fafc;">${p2Total}</td>
+              ${cats.map(c => `<td>${p2Words[c]||'-'} <span class="pts-badge pts-${p2Scores[c]}">[${p2Scores[c]}]</span></td>`).join('')}
+              <td style="font-weight:bold;">${p2Tot}</td><td class="total-pts-col">${nccCumulativeScores[opponentName]} pt</td>
             </tr>
           </tbody>
         </table>
       `;
     }
 
+    // ==========================================
+    // COSTANTI & GRAFICA CARTE NAPOLETANE
+    // ==========================================
+    const NAP_SUITS = ['denari', 'coppe', 'bastoni', 'spade'];
+    const NAP_SUIT_SYMBOLS = { denari: '🪙', coppe: '🏆', bastoni: '🪵', spade: '🗡️' };
 
-    // ==========================================
-    // 4. BRISCOLA & SCOPA
-    // ==========================================
-    function initBriscolaEngine() {
-      document.getElementById('statusMsg').textContent = `Briscola Napoletana: ${playerName}, seleziona la tua carta.`;
-      document.getElementById('gameContainer').innerHTML = `
-        <div class="cards-board">
-          <div class="table-cards-zone">
-            <div class="napoletana-card suit-denari"><div style="font-weight:bold;">1</div><div>🪙</div><div>Denari</div></div>
-          </div>
-          <div class="player-hand-zone">
-            <div class="napoletana-card suit-coppe" onclick="playCardB(true)"><div style="font-weight:bold;">3</div><div>🏆</div><div>Coppe</div></div>
-            <div class="napoletana-card suit-bastoni" onclick="playCardB(false)"><div style="font-weight:bold;">7</div><div>🪵</div><div>Bastoni</div></div>
-          </div>
+    function renderCardHTML(card, clickHandler = '') {
+      let iconArt = NAP_SUIT_SYMBOLS[card.suit];
+      let valDisplay = card.val;
+      let label = card.name;
+
+      if (card.val === 1) { iconArt = `✨${NAP_SUIT_SYMBOLS[card.suit]}✨`; label = 'Asso'; }
+      else if (card.val === 8) { iconArt = `💂‍♂️ ${NAP_SUIT_SYMBOLS[card.suit]}`; label = 'Fante'; }
+      else if (card.val === 9) { iconArt = `🐎 ${NAP_SUIT_SYMBOLS[card.suit]}`; label = 'Cavallo'; }
+      else if (card.val === 10) { iconArt = `👑 ${NAP_SUIT_SYMBOLS[card.suit]}`; label = 'Re'; }
+
+      return `
+        <div class="napoletana-card suit-${card.suit}" ${clickHandler}>
+          <div class="card-top-left"><span>${valDisplay}</span><span>${NAP_SUIT_SYMBOLS[card.suit]}</span></div>
+          <div class="card-center-art">${iconArt}</div>
+          <div class="card-bottom-right"><span>${label}</span></div>
         </div>
       `;
     }
-    function playCardB(win) {
-      if(win) {
-        showGameResult(true, playerName, opponentName);
-        addWin('briscola');
-      } else {
-        showGameResult(false, opponentName, playerName);
-        addOpponentWin('briscola');
+
+    // ==========================================
+    // 4. BRISCOLA NAPOLETANA
+    // ==========================================
+    let bDeck = [], bPlayerHand = [], bBotHand = [], bBriscolaCard = null, bBriscolaSuit = '', bPlayerScore = 0, bBotScore = 0, bTurn = 'player', bLead = 'player', bPlayedThisTrick = [], bIsProcessingTrick = false;
+    const BRISCOLA_POINTS = { 1: 11, 3: 10, 10: 4, 9: 3, 8: 2, 7: 0, 6: 0, 5: 0, 4: 0, 2: 0 };
+    const BRISCOLA_RANKS  = { 1: 10, 3: 9, 10: 8, 9: 7, 8: 6, 7: 5, 6: 4, 5: 3, 4: 2, 2: 1 };
+
+    function createBriscolaDeck() {
+      let deck = [];
+      for (let s of NAP_SUITS) {
+        for (let v = 1; v <= 10; v++) {
+          let name = v===1?'Asso':v===8?'Fante':v===9?'Cavallo':v===10?'Re':v.toString();
+          deck.push({ suit: s, val: v, name: name, pts: BRISCOLA_POINTS[v], rank: BRISCOLA_RANKS[v] });
+        }
       }
+      return deck.sort(() => Math.random() - 0.5);
     }
+    function initBriscolaEngine() {
+      bDeck = createBriscolaDeck();
+      bPlayerHand = [bDeck.pop(), bDeck.pop(), bDeck.pop()];
+      bBotHand = [bDeck.pop(), bDeck.pop(), bDeck.pop()];
+      bBriscolaCard = bDeck.pop(); bBriscolaSuit = bBriscolaCard.suit;
+      bPlayerScore = 0; bBotScore = 0; bLead = 'player'; bTurn = 'player'; bPlayedThisTrick = []; bIsProcessingTrick = false;
+      document.getElementById('statusMsg').textContent = `Briscola: ${bBriscolaSuit.toUpperCase()} ${NAP_SUIT_SYMBOLS[bBriscolaSuit]}. Tocca a te!`;
+      renderBriscolaBoard();
+    }
+    function renderBriscolaBoard() {
+      const container = document.getElementById('gameContainer');
+      let tableHtml = bBriscolaCard ? `
+        <div style="position:absolute; left:5px; top:50%; transform:translateY(-50%); text-align:center;">
+          <div style="font-size:0.55rem; color:var(--text-muted);">BRISCOLA</div>
+          ${renderCardHTML(bBriscolaCard)}
+          <div style="font-size:0.55rem; color:var(--text-muted); margin-top:2px;">Mazzo: ${bDeck.length + 1}</div>
+        </div>
+      ` : `<div style="position:absolute; left:5px; top:50%; transform:translateY(-50%); font-size:0.6rem;">Briscola: <b>${bBriscolaSuit}</b></div>`;
+
+      let playedCardsHtml = bPlayedThisTrick.map(p => renderCardHTML(p.card)).join('');
+      let playerHandHtml = bPlayerHand.map((c, i) => renderCardHTML(c, `onclick="playPlayerBriscolaCard(${i})"`)).join('');
+      let botHandHtml = bBotHand.map(() => `<div class="napoletana-card back-card">🂠</div>`).join('');
+
+      container.innerHTML = `
+        <div class="cards-board">
+          <div style="display:flex; justify-space-between; width:100%; font-size:0.75rem; background:#0f172a; padding:0.3rem 0.6rem; border-radius:6px;">
+            <span>👤 <b>${playerName}:</b> ${bPlayerScore} pt</span>
+            <span>🤖 <b>${opponentName}:</b> ${bBotScore} pt</span>
+          </div>
+          <div style="display:flex; gap:0.4rem;">${botHandHtml}</div>
+          <div class="table-cards-zone" style="position:relative;">${tableHtml}<div style="display:flex; gap:0.4rem; margin-left:55px;">${playedCardsHtml}</div></div>
+          <div class="player-hand-zone">${playerHandHtml}</div>
+        </div>
+      `;
+    }
+    function playPlayerBriscolaCard(idx) {
+      if (bTurn !== 'player' || bIsProcessingTrick) return;
+      bPlayedThisTrick.push({ playedBy: 'player', card: bPlayerHand.splice(idx, 1)[0] });
+      renderBriscolaBoard();
+      if (bPlayedThisTrick.length === 1) { bTurn = 'bot'; setTimeout(botBriscolaPlay, 600); }
+      else { bIsProcessingTrick = true; setTimeout(evaluateBriscolaTrick, 800); }
+    }
+    function botBriscolaPlay() {
+      if (bBotHand.length === 0 || bPlayedThisTrick.length >= 2) return;
+      let cardIdx = 0;
+      if (bPlayedThisTrick.length === 1) {
+        let pCard = bPlayedThisTrick[0].card;
+        let sameSuit = bBotHand.filter(c => c.suit === pCard.suit && c.rank > pCard.rank);
+        if (sameSuit.length > 0) cardIdx = bBotHand.indexOf(sameSuit[0]);
+      }
+      bPlayedThisTrick.push({ playedBy: 'bot', card: bBotHand.splice(cardIdx, 1)[0] });
+      renderBriscolaBoard();
+      if (bPlayedThisTrick.length === 1) { bTurn = 'player'; }
+      else { bIsProcessingTrick = true; setTimeout(evaluateBriscolaTrick, 800); }
+    }
+    function evaluateBriscolaTrick() {
+      const c1 = bPlayedThisTrick[0].card, c2 = bPlayedThisTrick[1].card;
+      let winner = bPlayedThisTrick[0].playedBy;
+      if (c2.suit === bBriscolaSuit && c1.suit !== bBriscolaSuit) winner = bPlayedThisTrick[1].playedBy;
+      else if (c1.suit === c2.suit && c2.rank > c1.rank) winner = bPlayedThisTrick[1].playedBy;
+
+      let pts = c1.pts + c2.pts;
+      if (winner === 'player') bPlayerScore += pts; else bBotScore += pts;
+      bLead = winner; bTurn = winner; bPlayedThisTrick = [];
+
+      if (bPlayerHand.length < 3) {
+        if (bDeck.length > 0) { bPlayerHand.push(bDeck.pop()); bBotHand.push(bDeck.pop()); }
+        else if (bBriscolaCard) { bPlayerHand.push(bBriscolaCard); bBriscolaCard = null; }
+      }
+      bIsProcessingTrick = false; renderBriscolaBoard();
+      if (bPlayerHand.length === 0 && bBotHand.length === 0) {
+        if (bPlayerScore > bBotScore) { showGameResult(true, playerName, opponentName); addWin('briscola'); }
+        else { showGameResult(false, opponentName, playerName); addOpponentWin('briscola'); }
+      } else if (bTurn === 'bot') setTimeout(botBriscolaPlay, 700);
+    }
+
+    // ==========================================
+    // 5. SCOPA NAPOLETANA
+    // ==========================================
+    let sDeck = [], sPlayerHand = [], sBotHand = [], sTable = [], sPlayerCaptured = [], sBotCaptured = [];
+    let sPlayerScope = 0, sBotScope = 0, sLastCapturer = 'player', sTurn = 'player', sIsProcessing = false;
 
     function initScopaEngine() {
-      document.getElementById('statusMsg').textContent = `Scopa Napoletana: Fai scopa per vincere!`;
-      document.getElementById('gameContainer').innerHTML = `
+      sDeck = [];
+      for (let s of NAP_SUITS) {
+        for (let v = 1; v <= 10; v++) {
+          let name = v===1?'Asso':v===8?'Fante':v===9?'Cavallo':v===10?'Re':v.toString();
+          sDeck.push({ suit: s, val: v, name: name });
+        }
+      }
+      sDeck.sort(() => Math.random() - 0.5);
+      sTable = [sDeck.pop(), sDeck.pop(), sDeck.pop(), sDeck.pop()];
+      sPlayerHand = [sDeck.pop(), sDeck.pop(), sDeck.pop()];
+      sBotHand = [sDeck.pop(), sDeck.pop(), sDeck.pop()];
+      sPlayerCaptured = []; sBotCaptured = []; sPlayerScope = 0; sBotScope = 0; sLastCapturer = 'player'; sTurn = 'player'; sIsProcessing = false;
+      document.getElementById('statusMsg').textContent = `Scopa Napoletana: Tocca a te!`;
+      renderScopaBoard();
+    }
+    function renderScopaBoard() {
+      const container = document.getElementById('gameContainer');
+      let tableHtml = sTable.map(c => renderCardHTML(c)).join('');
+      let playerHandHtml = sPlayerHand.map((c, i) => renderCardHTML(c, `onclick="playPlayerScopaCard(${i})"`)).join('');
+      let botHandHtml = sBotHand.map(() => `<div class="napoletana-card back-card">🂠</div>`).join('');
+
+      container.innerHTML = `
         <div class="cards-board">
-          <div class="table-cards-zone">
-            <div class="napoletana-card suit-spade"><div style="font-weight:bold;">7</div><div>🗡️</div><div>Spade</div></div>
+          <div style="display:flex; justify-content:space-between; width:100%; font-size:0.75rem; background:#0f172a; padding:0.3rem 0.6rem; border-radius:6px;">
+            <span>👤 <b>${playerName}:</b> ${sPlayerCaptured.length} carte | ${sPlayerScope} Scope</span>
+            <span>🤖 <b>${opponentName}:</b> ${sBotCaptured.length} carte | ${sBotScope} Scope</span>
           </div>
-          <div class="player-hand-zone">
-            <div class="napoletana-card suit-spade" onclick="playCardS(true)"><div style="font-weight:bold;">7</div><div>🗡️</div><div>Spade</div></div>
-          </div>
+          <div style="display:flex; gap:0.4rem;">${botHandHtml}</div>
+          <div class="table-cards-zone">${tableHtml || '<div style="font-size:0.75rem; color:var(--text-muted);">Tavolo Vuoto</div>'}</div>
+          <div class="player-hand-zone">${playerHandHtml}</div>
         </div>
       `;
     }
-    function playCardS(win) {
-      if(win) {
-        showGameResult(true, playerName, opponentName);
-        addWin('scopa');
+    function findScopaCaptures(card, table) {
+      let singles = table.filter(c => c.val === card.val);
+      if (singles.length > 0) return singles.map(c => [c]);
+      let combos = [];
+      function checkCombo(start, current, sum) {
+        if (sum === card.val) { combos.push([...current]); return; }
+        if (sum > card.val) return;
+        for (let i = start; i < table.length; i++) checkCombo(i + 1, [...current, table[i]], sum + table[i].val);
+      }
+      checkCombo(0, [], 0);
+      return combos;
+    }
+    function playPlayerScopaCard(idx) {
+      if (sTurn !== 'player' || sIsProcessing) return;
+      let card = sPlayerHand.splice(idx, 1)[0];
+      let caps = findScopaCaptures(card, sTable);
+      if (caps.length === 0) {
+        sTable.push(card);
       } else {
-        showGameResult(false, opponentName, playerName);
-        addOpponentWin('scopa');
+        let choice = caps[0];
+        sPlayerCaptured.push(card, ...choice);
+        sLastCapturer = 'player';
+        sTable = sTable.filter(c => !choice.includes(c));
+        if (sTable.length === 0 && (sDeck.length > 0 || sPlayerHand.length > 0 || sBotHand.length > 0)) {
+          sPlayerScope++; playSound('win');
+        }
+      }
+      sTurn = 'bot'; renderScopaBoard();
+      checkScopaRoundNext();
+    }
+    function botScopaPlay() {
+      if (sBotHand.length === 0) return;
+      let card = sBotHand.splice(0, 1)[0];
+      let caps = findScopaCaptures(card, sTable);
+      if (caps.length === 0) {
+        sTable.push(card);
+      } else {
+        let choice = caps[0];
+        sBotCaptured.push(card, ...choice);
+        sLastCapturer = 'bot';
+        sTable = sTable.filter(c => !choice.includes(c));
+        if (sTable.length === 0 && (sDeck.length > 0 || sPlayerHand.length > 0 || sBotHand.length > 0)) {
+          sBotScope++;
+        }
+      }
+      sTurn = 'player'; renderScopaBoard();
+      checkScopaRoundNext();
+    }
+    function checkScopaRoundNext() {
+      if (sPlayerHand.length === 0 && sBotHand.length === 0) {
+        if (sDeck.length >= 6) {
+          sPlayerHand = [sDeck.pop(), sDeck.pop(), sDeck.pop()];
+          sBotHand = [sDeck.pop(), sDeck.pop(), sDeck.pop()];
+          renderScopaBoard();
+          if (sTurn === 'bot') setTimeout(botScopaPlay, 600);
+        } else {
+          if (sLastCapturer === 'player') sPlayerCaptured.push(...sTable);
+          else sBotCaptured.push(...sTable);
+          sTable = [];
+          
+          let pPts = sPlayerScope + (sPlayerCaptured.length > 20 ? 1 : 0);
+          let bPts = sBotScope + (sBotCaptured.length > 20 ? 1 : 0);
+          
+          renderScopaBoard();
+          if (pPts >= bPts) { showGameResult(true, playerName, opponentName); addWin('scopa'); }
+          else { showGameResult(false, opponentName, playerName); addOpponentWin('scopa'); }
+          return;
+        }
+      } else if (sTurn === 'bot') {
+        setTimeout(botScopaPlay, 600);
       }
     }
 
+    // ==========================================
+    // 6. IMPICCATO
+    // ==========================================
+    let impWord = '', impGuessed = [], impMistakes = 0;
+    const impDictionary = ["ARCHITETTURA", "BIBLIOTECA", "COMPUTER", "DIZIONARIO", "ELEFANTE", "FILOSOFIA", "GIORNALE", "IMMAGINAZIONE", "LABIRINTO", "MONTAGNA", "NAVIGATORE", "ORCHESTRA", "PSICOLOGIA", "QUADRO", "RISTORANTE", "SCULTURA", "TELEFONO", "UNIVERSITA", "VELOCIPEDE", "ZAINO", "CARNEVALE", "DESIDERIO", "ENERGIA", "FANTASIA", "GALASSIA", "ILLUSIONE", "MARAVIGLIA", "NOSTALGIA", "ORIZZONTE", "PARADISO", "RIVOLUZIONE", "SIMPATIA", "TEMPESTA", "VACANZA"];
 
-    // ==========================================
-    // 5. IMPICCATO & TRIS
-    // ==========================================
     function initImpiccato() {
-      document.getElementById('statusMsg').textContent = "Indovina la parola segreta!";
+      impGuessed = []; impMistakes = 0;
+      document.getElementById('statusMsg').textContent = "Impiccato: Scegli la modalità di parola!";
       document.getElementById('gameContainer').innerHTML = `
-        <div style="font-size:1.5rem; letter-spacing:4px; font-weight:bold; margin-bottom:0.4rem; color:#facc15;">_ A _ A _ A</div>
-        <div style="display:flex; gap:0.3rem;">
-          <button class="btn" onclick="guessImp(true)">Indovina 'B'</button>
-          <button class="btn btn-stop" onclick="guessImp(false)">Sbaglia 'Z'</button>
+        <div class="impiccato-container">
+          <div style="display:flex; gap:0.4rem; margin-bottom:0.5rem; flex-wrap:wrap; justify-content:center;">
+            <button class="btn btn-success" onclick="setupRandomImpWord()">🎲 Parola Casuale Dizionario</button>
+            <button class="btn" onclick="setupCustomSecretImpWord()">🔒 Inserisci Parola Segreta</button>
+          </div>
+          <div id="impGameArea" style="display:none; flex-direction:column; align-items:center; width:100%;"></div>
         </div>
       `;
     }
-    function guessImp(win) {
-      if(win) {
-        showGameResult(true, playerName, opponentName);
-        addWin('impiccato');
-      } else {
-        showGameResult(false, opponentName, playerName);
-        addOpponentWin('impiccato');
+    function setupRandomImpWord() {
+      impWord = impDictionary[Math.floor(Math.random() * impDictionary.length)];
+      startImpGame();
+    }
+    function setupCustomSecretImpWord() {
+      let secret = prompt("Inserisci la parola segreta (sarà nascosta):");
+      if (secret && secret.trim().length > 1) {
+        impWord = secret.trim().toUpperCase().replace(/[^A-Z]/g, '');
+        startImpGame();
       }
     }
+    function startImpGame() {
+      document.getElementById('impGameArea').style.display = 'flex';
+      renderImpBoard();
+    }
+    function renderImpBoard() {
+      const area = document.getElementById('impGameArea');
+      let wordDisplay = impWord.split('').map(l => impGuessed.includes(l) ? l : '_').join(' ');
+      let slotsHtml = impWord.split('').map(l => `<div class="letter-slot">${impGuessed.includes(l) ? l : ''}</div>`).join('');
+      
+      let kbHtml = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split('').map(l => `
+        <button class="kb-key" ${impGuessed.includes(l)?'disabled':''} onclick="guessImpLetter('${l}')">${l}</button>
+      `).join('');
 
-    let trisState = Array(9).fill('');
-    function initTris() {
-      trisState = Array(9).fill('');
-      document.getElementById('statusMsg').textContent = `Tris: Fai 3 in fila contro ${opponentName}!`;
-      document.getElementById('gameContainer').innerHTML = `
-        <div style="display:grid; grid-template-columns:repeat(3,45px); gap:4px;">
-          ${trisState.map((_,i) => `<div style="width:45px; height:45px; background:#334155; border-radius:4px; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:1.2rem; cursor:pointer;" onclick="clickTris(${i}, this)"></div>`).join('')}
+      area.innerHTML = `
+        <div class="impiccato-svg-box">
+          <svg width="100%" height="100%" viewBox="0 0 100 100">
+            <line x1="10" y1="90" x2="90" y2="90" stroke="#94a3b8" stroke-width="4"/>
+            <line x1="30" y1="90" x2="30" y2="10" stroke="#94a3b8" stroke-width="4"/>
+            <line x1="30" y1="10" x2="70" y2="10" stroke="#94a3b8" stroke-width="4"/>
+            <line x1="70" y1="10" x2="70" y2="25" stroke="#94a3b8" stroke-width="2"/>
+            ${impMistakes > 0 ? '<circle cx="70" cy="33" r="8" stroke="#ef4444" stroke-width="3" fill="none"/>' : ''}
+            ${impMistakes > 1 ? '<line x1="70" y1="41" x2="70" y2="65" stroke="#ef4444" stroke-width="3"/>' : ''}
+            ${impMistakes > 2 ? '<line x1="70" y1="48" x2="55" y2="58" stroke="#ef4444" stroke-width="3"/>' : ''}
+            ${impMistakes > 3 ? '<line x1="70" y1="48" x2="85" y2="58" stroke="#ef4444" stroke-width="3"/>' : ''}
+            ${impMistakes > 4 ? '<line x1="70" y1="65" x2="58" y2="82" stroke="#ef4444" stroke-width="3"/>' : ''}
+            ${impMistakes > 5 ? '<line x1="70" y1="65" x2="82" y2="82" stroke="#ef4444" stroke-width="3"/>' : ''}
+          </svg>
         </div>
+        <div class="word-letters-box">${slotsHtml}</div>
+        <div class="kb-row">${kbHtml}</div>
       `;
+
+      if (!wordDisplay.includes('_')) {
+        showGameResult(true, playerName, opponentName); addWin('impiccato');
+      } else if (impMistakes >= 6) {
+        showGameResult(false, opponentName, playerName); addOpponentWin('impiccato');
+      }
     }
-    function clickTris(i, el) {
-      if(el.textContent) return;
-      el.textContent = 'X'; el.style.color = '#38bdf8';
-      showGameResult(true, playerName, opponentName);
-      addWin('tris');
+    function guessImpLetter(l) {
+      if (impGuessed.includes(l)) return;
+      impGuessed.push(l);
+      if (!impWord.includes(l)) impMistakes++;
+      renderImpBoard();
     }
 
+    // ==========================================
+    // 7. TRIS CLASSICO
+    // ==========================================
+    let trisBoard = Array(9).fill('');
+    function initTris() {
+      trisBoard = Array(9).fill('');
+      document.getElementById('statusMsg').textContent = `Tris: Tocca a te (X).`;
+      renderTris();
+    }
+    function renderTris() {
+      let grid = trisBoard.map((c, i) => `<div class="tris-cell" onclick="playTris(${i})">${c}</div>`).join('');
+      document.getElementById('gameContainer').innerHTML = `<div class="tris-grid">${grid}</div>`;
+    }
+    function playTris(i) {
+      if (trisBoard[i] !== '') return;
+      trisBoard[i] = 'X'; renderTris();
+      if (checkTrisWin('X')) { showGameResult(true, playerName, opponentName); addWin('tris'); return; }
+      let avail = trisBoard.map((c, idx) => c === '' ? idx : null).filter(v => v !== null);
+      if (avail.length === 0) return;
+      let botPick = avail[Math.floor(Math.random() * avail.length)];
+      trisBoard[botPick] = 'O'; renderTris();
+      if (checkTrisWin('O')) { showGameResult(false, opponentName, playerName); addOpponentWin('tris'); }
+    }
+    function checkTrisWin(p) {
+      const wins = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+      return wins.some(([a,b,c]) => trisBoard[a]===p && trisBoard[b]===p && trisBoard[c]===p);
+    }
+
+    // Avvio Predefinito
     resetCurrentGame();
   </script>
 </body>
