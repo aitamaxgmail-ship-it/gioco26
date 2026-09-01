@@ -180,6 +180,27 @@
   </style>
 </head>
 <body>
+
+  <!-- MODAL ACCESSO CON PASSWORD CANALE -->
+  <div id="loginModal" style="position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(15,23,42,0.96); z-index:99999; display:flex; align-items:center; justify-content:center; padding:1rem;">
+    <div style="background:#1e293b; border:2px solid #6366f1; padding:1.5rem; border-radius:12px; max-width:380px; width:100%; text-align:center; box-shadow:0 10px 25px rgba(0,0,0,0.6);">
+      <h2 style="color:#38bdf8; margin-bottom:0.6rem; font-size:1.3rem;">🎮 Accesso Canale gioco26</h2>
+      <p style="font-size:0.8rem; color:#94a3b8; margin-bottom:1.2rem; line-height:1.3;">Inserisci il tuo nome e la password del canale. I giocatori con la stessa password entreranno nello stesso canale per sfidarsi e chattare!</p>
+      
+      <div style="display:flex; flex-direction:column; gap:0.8rem; text-align:left;">
+        <div>
+          <label style="font-size:0.75rem; color:#38bdf8; font-weight:bold;">Nome Giocatore:</label>
+          <input type="text" id="modalPlayerName" class="player-input" value="Giocatore 1" style="width:100%; padding:0.5rem; font-size:0.85rem; margin-top:0.2rem;">
+        </div>
+        <div>
+          <label style="font-size:0.75rem; color:#38bdf8; font-weight:bold;">Password Canale Comune:</label>
+          <input type="password" id="modalChannelPass" class="player-input" value="gioco26" style="width:100%; padding:0.5rem; font-size:0.85rem; margin-top:0.2rem;" placeholder="Es: stanza123">
+        </div>
+        <button class="btn btn-success" style="padding:0.6rem; margin-top:0.5rem; font-size:0.9rem; font-weight:bold;" onclick="submitChannelLogin()">🚀 Entra nel Canale</button>
+      </div>
+    </div>
+  </div>
+
   <div class="app-layout">
     
     <!-- SEZIONE PRINCIPALE -->
@@ -210,11 +231,10 @@
 
       <!-- UTENZA ONLINE -->
       <div class="online-box">
-        <div>Utenza gioco26: <span class="user-badge" id="myPeerId">Generazione...</span></div>
+        <div>Canale gioco26: <span class="user-badge" id="myPeerId">In attesa accesso...</span></div>
         <div style="display:flex; gap:0.3rem; align-items:center; flex-wrap:wrap;">
           <span class="player-limit-tag" id="ruleLimitTag">Capacità: 2 Giocatori</span>
-          <input type="text" id="targetPeerInput" class="player-input" placeholder="Codice gioco26" style="width:110px;">
-          <button class="btn btn-success" onclick="connectToPeer()">🔗 Connetti</button>
+          <button class="btn btn-success" onclick="document.getElementById('loginModal').style.display='flex'">🔑 Cambia Canale</button>
         </div>
       </div>
 
@@ -255,9 +275,9 @@
     <!-- SIDEBAR DESTRA -->
     <div class="sidebar-right">
       <div class="chat-card">
-        <div class="chat-header">💬 Chat Live Online</div>
+        <div class="chat-header">💬 Chat Live Canale</div>
         <div class="chat-messages" id="chatLogs">
-          <div class="chat-msg"><span style="color:var(--accent); font-weight:bold;">Sistema:</span> Benvenuto su gioco26!</div>
+          <div class="chat-msg"><span style="color:var(--accent); font-weight:bold;">Sistema:</span> Benvenuto su gioco26! Effettua l'accesso per accedere al canale.</div>
         </div>
         <div class="chat-input-row">
           <input type="text" id="chatInput" class="chat-input player-input" style="flex:1;" placeholder="Scrivi..." onkeydown="if(event.key==='Enter') sendChatMessage()">
@@ -359,7 +379,6 @@
       } catch(e) {}
     }
 
-    // LISTENER GLOBALE PER SUONO AL CLIC DI TASTI E INTERAZIONI
     document.addEventListener('click', (e) => {
       if (e.target.closest('button, .tab-btn, .btn, .tris-cell, .dama-cell, .naval-cell, .napoletana-card, .kb-key, .radio-card')) {
         playClickSound();
@@ -387,6 +406,7 @@
     // --- SEGNAPUNTI E UTENTI ---
     let playerName = "Giocatore 1";
     let opponentName = "Bot";
+    let channelPassword = "gioco26";
     let scores = { battaglia: 0, dama: 0, ncc: 0, briscola: 0, scopa: 0, impiccato: 0, tris: 0 };
     let opponentScores = { battaglia: 0, dama: 0, ncc: 0, briscola: 0, scopa: 0, impiccato: 0, tris: 0 };
     
@@ -427,7 +447,7 @@
     // --- REGOLE E SWITCH GIOCHI ---
     const GAME_RULES = {
       battaglia: { name: "Battaglia Navale", maxPlayers: "2 Giocatori (1v1)" },
-      dama: { name: "Dama Italiana (Regola del Soffio)", maxPlayers: "2 Giocatori (1v1)" },
+      dama: { name: "Dama Italiana (Prese Multiple e Soffio)", maxPlayers: "2 Giocatori (1v1)" },
       ncc: { name: "Nome Cose Città Animale Mestiere Frutta", maxPlayers: "2 a 5 Giocatori" },
       briscola: { name: "Briscola Napoletana", maxPlayers: "2 Giocatori (1v1)" },
       scopa: { name: "Scopa Napoletana", maxPlayers: "2 Giocatori (1v1)" },
@@ -470,108 +490,124 @@
       else if (currentGame === 'tris') initTris();
     }
 
-    // --- PEERJS MULTIGIOCATORE ---
-    let peer = null, peerConn = null, myPeerId = "";
-    function initPeer() {
-      try {
-        const randomId = "gioco26-" + Math.floor(1000 + Math.random() * 9000);
-        peer = new Peer(randomId, {
-          config: {
-            iceServers: [
-              { urls: 'stun:stun.l.google.com:19302' },
-              { urls: 'stun:stun1.l.google.com:19302' },
-              { urls: 'stun:stun2.l.google.com:19302' }
-            ]
-          }
-        });
+    // --- PEERJS CANALE UNICO BASATO SU PASSWORD ---
+    let peer = null, peerConn = null, myPeerId = "", roomPeers = [], isHost = false;
 
-        peer.on('open', (id) => { 
-          myPeerId = id; 
-          document.getElementById('myPeerId').textContent = id; 
-        });
+    function submitChannelLogin() {
+      const pName = document.getElementById('modalPlayerName').value.trim();
+      const pass = document.getElementById('modalChannelPass').value.trim();
+      if (!pName) { alert("Inserisci un nome valido!"); return; }
+      if (!pass) { alert("Inserisci una password per il canale!"); return; }
 
+      playerName = pName;
+      channelPassword = pass;
+      document.getElementById('playerNameInput').value = playerName;
+      document.getElementById('loginModal').style.display = 'none';
+
+      let cleanPass = pass.toLowerCase().replace(/[^a-z0-9]/g, '') || 'default';
+      initPeerWithPassword(cleanPass);
+      renderScoreboard();
+    }
+
+    function initPeerWithPassword(pass) {
+      if (peer) { try { peer.destroy(); } catch(e){} }
+      roomPeers = [];
+      peerConn = null;
+
+      const hostId = "gioco26-room-" + pass;
+      
+      peer = new Peer(hostId, {
+        config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
+      });
+
+      peer.on('open', (id) => { 
+        isHost = true;
+        myPeerId = id; 
+        document.getElementById('myPeerId').textContent = "CANALE: " + channelPassword + " (HOST)"; 
+        addChatMessage("Sistema", `👑 Sei l'host del canale '${channelPassword}'! In attesa di altri giocatori...`);
+        
         peer.on('connection', (conn) => { 
-          peerConn = conn; 
-          setupPeerListeners(); 
+          roomPeers.push(conn);
+          setupPeerConnection(conn); 
         });
+      });
 
-        peer.on('disconnected', () => {
-          if (peer && !peer.destroyed) peer.reconnect();
-        });
+      peer.on('error', (err) => { 
+        if (err.type === 'unavailable-id') {
+          // L'host esiste già: ci colleghiamo come Client al Canale
+          const clientId = "gioco26-usr-" + pass + "-" + Math.floor(1000 + Math.random() * 9000);
+          peer = new Peer(clientId, {
+            config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
+          });
 
-        peer.on('error', (err) => { 
+          peer.on('open', (id) => {
+            isHost = false;
+            myPeerId = id;
+            document.getElementById('myPeerId').textContent = "CANALE: " + channelPassword;
+            peerConn = peer.connect(hostId);
+            setupPeerConnection(peerConn);
+          });
+        } else {
           console.error("PeerJS Error:", err); 
-          addChatMessage("Sistema", `⚠️ Errore di connessione: ${err.type}`);
-        });
-      } catch(e) { console.error(e); }
+          addChatMessage("Sistema", `⚠️ Connessione canale: ${err.type}`);
+        }
+      });
     }
 
-    function connectToPeer() {
-      const targetId = document.getElementById('targetPeerInput').value.trim();
-      if (!targetId) { alert("Inserisci prima il codice di un amico!"); return; }
-      if (peer) {
-        peerConn = peer.connect(targetId);
-        setupPeerListeners();
-      }
-    }
-
-    function setupPeerListeners() {
-      if(!peerConn) return;
-
-      peerConn.off('open');
-      peerConn.off('data');
-      peerConn.off('error');
-      peerConn.off('close');
-
-      const onOpen = () => {
-        addChatMessage("Sistema", "🔗 Connessione gioco26 Stabilita!");
+    function setupPeerConnection(conn) {
+      conn.on('open', () => {
+        if (!peerConn) peerConn = conn;
+        addChatMessage("Sistema", "🔗 Connesso al canale condiviso!");
         document.getElementById('opponentMode').value = 'online';
-        peerConn.send({ type: 'handshake', name: playerName });
-      };
+        conn.send({ type: 'handshake', name: playerName });
+      });
 
-      if (peerConn.open) {
-        onOpen();
-      } else {
-        peerConn.on('open', onOpen);
-      }
-
-      peerConn.on('data', (data) => {
+      conn.on('data', (data) => {
         if (data.type === 'handshake') {
           opponentName = data.name;
           document.getElementById('opponentNameInput').value = opponentName;
           document.getElementById('opponentMode').value = 'online';
           renderScoreboard();
-          addChatMessage("Sistema", `🎮 ${opponentName} si è connesso!`);
-          peerConn.send({ type: 'handshake_ack', name: playerName });
+          addChatMessage("Sistema", `🎮 ${opponentName} si è unito al canale!`);
+          conn.send({ type: 'handshake_ack', name: playerName });
         } else if (data.type === 'handshake_ack') {
           opponentName = data.name;
           document.getElementById('opponentNameInput').value = opponentName;
           renderScoreboard();
         } else if (data.type === 'chat') {
           addChatMessage(data.sender, data.text);
+          if (isHost) {
+            roomPeers.forEach(p => { if (p !== conn && p.open) p.send(data); });
+          }
         } else if (data.type === 'game_move') {
           handleRemoteMove(data);
+          if (isHost) {
+            roomPeers.forEach(p => { if (p !== conn && p.open) p.send(data); });
+          }
         } else if (data.type === 'ncc_spin') {
           receiveRemoteSpin(data.letter);
+          if (isHost) roomPeers.forEach(p => { if (p !== conn && p.open) p.send(data); });
         } else if (data.type === 'ncc_stop') {
           receiveRemoteNccStop();
+          if (isHost) roomPeers.forEach(p => { if (p !== conn && p.open) p.send(data); });
         } else if (data.type === 'ncc_submit') {
           receiveRemoteNccSubmit(data.words);
+          if (isHost) roomPeers.forEach(p => { if (p !== conn && p.open) p.send(data); });
         }
       });
 
-      peerConn.on('close', () => {
-        addChatMessage("Sistema", "❌ Connessione interrotta dall'avversario.");
-      });
-
-      peerConn.on('error', (err) => {
-        console.error("PeerConn Error:", err);
+      conn.on('close', () => {
+        addChatMessage("Sistema", "❌ Un utente ha lasciato il canale.");
+        roomPeers = roomPeers.filter(p => p !== conn);
+        if (peerConn === conn) peerConn = roomPeers[0] || null;
       });
     }
 
-    function sendPeerMove(moveData) {
-      if (document.getElementById('opponentMode').value === 'online' && peerConn && peerConn.open) {
-        peerConn.send({ type: 'game_move', game: currentGame, ...moveData });
+    function broadcastData(data) {
+      if (isHost) {
+        roomPeers.forEach(p => { if (p && p.open) p.send(data); });
+      } else if (peerConn && peerConn.open) {
+        peerConn.send(data);
       }
     }
 
@@ -584,6 +620,7 @@
       } else if (data.game === 'dama') {
         if (data.action === 'soffio') {
           damaBoard[data.soffioIndex] = null;
+          document.getElementById('statusMsg').textContent = `💨 SOFFIO! ${opponentName} ha perso la pedina per mancata presa!`;
         } else {
           damaBoard[data.to] = damaBoard[data.from];
           damaBoard[data.from] = null;
@@ -624,7 +661,6 @@
       renderScoreboard();
       resetCurrentGame(true); 
     }
-    initPeer();
 
     // --- CHAT & RADIO ---
     function addChatMessage(user, text) {
@@ -638,7 +674,7 @@
       const input = document.getElementById('chatInput');
       if(!input.value.trim()) return;
       addChatMessage(playerName, input.value.trim());
-      if(peerConn && peerConn.open) peerConn.send({type:'chat', sender:playerName, text:input.value.trim()});
+      broadcastData({ type: 'chat', sender: playerName, text: input.value.trim() });
       input.value = '';
     }
     const stations = [
@@ -810,7 +846,7 @@
       } else { navalBotGrid[idx] = -2; }
 
       if (document.getElementById('opponentMode').value === 'online') {
-        sendPeerMove({ game: 'battaglia', action: 'shoot', index: idx });
+        broadcastData({ type: 'game_move', game: 'battaglia', action: 'shoot', index: idx });
         renderNavalBattle();
       } else {
         botShootNaval();
@@ -829,11 +865,12 @@
     }
 
     // ==========================================
-    // 2. DAMA TRADIZIONALE ITALIANA CON REGOLA DEL SOFFIO (REGOLAMENTO UFFICIALE)
+    // 2. DAMA TRADIZIONALE ITALIANA (PRESE MULTIPLE E SOFFIO)
     // ==========================================
-    let damaBoard = [], selectedDamaCell = null;
+    let damaBoard = [], selectedDamaCell = null, damaMultiJumpPiece = null;
+
     function initDamaEngine() {
-      damaBoard = Array(64).fill(null); selectedDamaCell = null;
+      damaBoard = Array(64).fill(null); selectedDamaCell = null; damaMultiJumpPiece = null;
       for(let r=0; r<8; r++) {
         for(let c=0; c<8; c++) {
           if((r+c)%2 === 1) {
@@ -842,15 +879,17 @@
           }
         }
       }
-      document.getElementById('statusMsg').textContent = `Dama Italiana (Regola del Soffio): Muove ${playerName} (Bianchi). La presa è obbligatoria: se ometti di mangiare, la tua pedina viene soffiata via!`;
+      document.getElementById('statusMsg').textContent = `Dama Italiana: La presa è obbligatoria! Prese multiple attive. Se ometti di mangiare scatta il Soffio.`;
       renderDamaBoard();
     }
+
     function renderDamaBoard() {
       const container = document.getElementById('gameContainer');
       let html = '<div class="dama-board">';
       for(let i=0; i<64; i++) {
         let r = Math.floor(i/8), c = i%8, isDark = (r+c)%2 === 1, piece = damaBoard[i];
-        let style = selectedDamaCell === i ? 'outline: 2px solid #22c55e;' : '';
+        let style = selectedDamaCell === i ? 'outline: 3px solid #22c55e;' : '';
+        if (damaMultiJumpPiece === i) style = 'outline: 3px solid #eab308; animation: pulse 1s infinite;';
         html += `<div class="dama-cell ${isDark?'dark':'light'}" style="${style}" onclick="handleDamaClick(${i})">`;
         if(piece) html += `<div class="dama-piece ${piece.color}">${piece.isKing?'👑':'●'}</div>`;
         html += `</div>`;
@@ -859,143 +898,214 @@
       container.innerHTML = html;
     }
 
-    function getAllAvailableJumps(color) {
+    function getJumpsForPiece(board, idx) {
+      let piece = board[idx];
+      if (!piece) return [];
       let jumps = [];
-      for (let i = 0; i < 64; i++) {
-        let piece = damaBoard[i];
-        if (piece && piece.color === color) {
-          let r = Math.floor(i/8), c = i%8;
-          let dirs = piece.isKing ? [[-1,-1],[-1,1],[1,-1],[1,1]] : (color === 'white' ? [[-1,-1],[-1,1]] : [[1,-1],[1,1]]);
-          dirs.forEach(([dr, dc]) => {
-            let midR = r + dr, midC = c + dc;
-            let toR = r + dr*2, toC = c + dc*2;
-            if (toR >= 0 && toR < 8 && toC >= 0 && toC < 8) {
-              let midIdx = midR * 8 + midC;
-              let toIdx = toR * 8 + toC;
-              let targetPiece = damaBoard[midIdx];
-              let enemyColor = color === 'white' ? 'black' : 'white';
-              if (targetPiece && targetPiece.color === enemyColor && damaBoard[toIdx] === null) {
-                if (piece.isKing || !targetPiece.isKing) {
-                  jumps.push({ from: i, to: toIdx, mid: midIdx });
-                }
-              }
+      let r = Math.floor(idx / 8), c = idx % 8;
+      let dirs = piece.isKing 
+        ? [[-1,-1], [-1,1], [1,-1], [1,1]] 
+        : (piece.color === 'white' ? [[-1,-1], [-1,1]] : [[1,-1], [1,1]]);
+
+      dirs.forEach(([dr, dc]) => {
+        let midR = r + dr, midC = c + dc;
+        let toR = r + dr * 2, toC = c + dc * 2;
+        if (toR >= 0 && toR < 8 && toC >= 0 && toC < 8) {
+          let midIdx = midR * 8 + midC;
+          let toIdx = toR * 8 + toC;
+          let targetPiece = board[midIdx];
+          let enemyColor = piece.color === 'white' ? 'black' : 'white';
+
+          if (targetPiece && targetPiece.color === enemyColor && board[toIdx] === null) {
+            if (piece.isKing || !targetPiece.isKing) {
+              jumps.push({ from: idx, to: toIdx, mid: midIdx });
             }
-          });
+          }
+        }
+      });
+      return jumps;
+    }
+
+    function getAllJumpsForColor(board, color) {
+      let allJumps = [];
+      for (let i = 0; i < 64; i++) {
+        if (board[i] && board[i].color === color) {
+          let j = getJumpsForPiece(board, i);
+          allJumps = allJumps.concat(j);
         }
       }
-      return jumps;
+      return allJumps;
     }
 
     function handleDamaClick(idx) {
       let piece = damaBoard[idx];
-      if (selectedDamaCell === null) {
-        if (piece && piece.color === 'white') { selectedDamaCell = idx; renderDamaBoard(); }
-      } else {
-        if (idx === selectedDamaCell) { selectedDamaCell = null; renderDamaBoard(); return; }
-        let from = selectedDamaCell;
-        if (piece && piece.color === 'white') { selectedDamaCell = idx; renderDamaBoard(); return; }
-        
-        let pFrom = damaBoard[from];
-        let rFrom = Math.floor(from/8), cFrom = from%8, rTo = Math.floor(idx/8), cTo = idx%8;
-        let dr = rTo - rFrom, dc = cTo - cFrom;
-        
-        let isValidMove = false;
-        let isJump = false;
-        let midIdx = null;
 
-        if (damaBoard[idx] === null) {
+      // Se c'è una presa multipla in corso, obbliga a continuare con la stessa pedina
+      if (damaMultiJumpPiece !== null) {
+        if (selectedDamaCell !== damaMultiJumpPiece) selectedDamaCell = damaMultiJumpPiece;
+        let jumps = getJumpsForPiece(damaBoard, damaMultiJumpPiece);
+        let chosenJump = jumps.find(j => j.to === idx);
+        if (chosenJump) {
+          executeDamaMove(chosenJump.from, chosenJump.to, chosenJump.mid, true);
+        } else {
+          document.getElementById('statusMsg').textContent = "⚠️ Presa multipla obbligatoria! Devi continuare a mangiare con la stessa pedina.";
+        }
+        return;
+      }
+
+      if (selectedDamaCell === null) {
+        if (piece && piece.color === 'white') {
+          selectedDamaCell = idx;
+          renderDamaBoard();
+        }
+      } else {
+        if (idx === selectedDamaCell) {
+          selectedDamaCell = null;
+          renderDamaBoard();
+          return;
+        }
+        let from = selectedDamaCell;
+        let pFrom = damaBoard[from];
+
+        if (piece && piece.color === 'white') {
+          selectedDamaCell = idx;
+          renderDamaBoard();
+          return;
+        }
+
+        let allAvailableJumps = getAllJumpsForColor(damaBoard, 'white');
+        let pieceJumps = getJumpsForPiece(damaBoard, from);
+        let chosenJump = pieceJumps.find(j => j.to === idx);
+
+        let rFrom = Math.floor(from / 8), cFrom = from % 8;
+        let rTo = Math.floor(idx / 8), cTo = idx % 8;
+        let dr = rTo - rFrom, dc = cTo - cFrom;
+
+        let isSimpleMove = false;
+        if (damaBoard[idx] === null && allAvailableJumps.length === 0) {
           if (pFrom.isKing) {
-            if (Math.abs(dr) === 1 && Math.abs(dc) === 1) {
-              isValidMove = true;
-            } else if (Math.abs(dr) === 2 && Math.abs(dc) === 2) {
-              midIdx = ((rFrom + rTo)/2)*8 + ((cFrom + cTo)/2);
-              if (damaBoard[midIdx] && damaBoard[midIdx].color === 'black') {
-                isValidMove = true; isJump = true;
-              }
-            }
+            if (Math.abs(dr) === 1 && Math.abs(dc) === 1) isSimpleMove = true;
           } else {
-            if (dr === -1 && Math.abs(dc) === 1) {
-              isValidMove = true;
-            } else if (dr === -2 && Math.abs(dc) === 2) {
-              midIdx = ((rFrom + rTo)/2)*8 + ((cFrom + cTo)/2);
-              if (damaBoard[midIdx] && damaBoard[midIdx].color === 'black' && !damaBoard[midIdx].isKing) {
-                isValidMove = true; isJump = true;
-              }
-            }
+            if (dr === -1 && Math.abs(dc) === 1) isSimpleMove = true;
           }
         }
 
-        if (isValidMove) {
-          isGameActive = true;
-
-          let availJumps = getAllAvailableJumps('white');
-          if (!isJump && availJumps.length > 0) {
-            let soffioPieceIdx = availJumps[0].from;
-            damaBoard[soffioPieceIdx] = null;
-            document.getElementById('statusMsg').textContent = `💨 SOFFIO! Non hai effettuato la presa d'obbligo: la pedina è stata eliminata!`;
-            playSound('loss');
-            sendPeerMove({ game: 'dama', action: 'soffio', soffioIndex: soffioPieceIdx });
-          }
-
-          damaBoard[idx] = damaBoard[from]; damaBoard[from] = null;
-          if (isJump && midIdx !== null) damaBoard[midIdx] = null;
-          if (rTo === 0) damaBoard[idx].isKing = true;
-          selectedDamaCell = null; renderDamaBoard();
-
-          let blackCount = damaBoard.filter(p => p && p.color === 'black').length;
-          if (blackCount === 0) { showGameResult(true, playerName, opponentName); addWin('dama'); return; }
-
-          sendPeerMove({ game: 'dama', action: 'move', from: from, to: idx, mid: isJump ? midIdx : null });
-
-          if (document.getElementById('opponentMode').value === 'bot') {
-            setTimeout(botDamaMove, 500);
-          }
-        } else { selectedDamaCell = null; renderDamaBoard(); }
+        if (chosenJump) {
+          executeDamaMove(from, idx, chosenJump.mid, true);
+        } else if (allAvailableJumps.length > 0) {
+          // Si è provata una mossa normale ignorando una presa -> SOFFIO!
+          let soffioPieceIdx = allAvailableJumps[0].from;
+          damaBoard[soffioPieceIdx] = null;
+          document.getElementById('statusMsg').textContent = `💨 SOFFIO! Mancata presa d'obbligo: la pedina è stata eliminata!`;
+          playSound('loss');
+          broadcastData({ type: 'game_move', game: 'dama', action: 'soffio', soffioIndex: soffioPieceIdx });
+          selectedDamaCell = null;
+          renderDamaBoard();
+          
+          let whiteCount = damaBoard.filter(p => p && p.color === 'white').length;
+          if (whiteCount === 0) { showGameResult(false, opponentName, playerName); addOpponentWin('dama'); }
+        } else if (isSimpleMove) {
+          executeDamaMove(from, idx, null, false);
+        } else {
+          selectedDamaCell = null;
+          renderDamaBoard();
+        }
       }
     }
-    function botDamaMove() {
-      let blackPieces = [];
-      for (let i=0; i<64; i++) if(damaBoard[i] && damaBoard[i].color==='black') blackPieces.push(i);
-      if(blackPieces.length === 0) { showGameResult(true, playerName, opponentName); addWin('dama'); return; }
-      
-      let jumps = [], simpleMoves = [];
-      blackPieces.forEach(from => {
-        let p = damaBoard[from];
-        let r = Math.floor(from/8), c = from%8;
-        let dirs = p.isKing ? [[-1,-1],[-1,1],[1,-1],[1,1]] : [[1,-1],[1,1]];
-        
-        dirs.forEach(([dr,dc]) => {
-          let nr = r + dr, nc = c + dc, to = nr*8 + nc;
-          if (nr>=0 && nr<8 && nc>=0 && nc<8 && damaBoard[to] === null) {
-            simpleMoves.push({from, to, mid: null});
-          }
-          let jnr = r + dr*2, jnc = c + dc*2, jto = jnr*8 + jnc;
-          let mid = (r+dr)*8 + (c+dc);
-          if (jnr>=0 && jnr<8 && jnc>=0 && jnc<8 && damaBoard[jto] === null && damaBoard[mid] && damaBoard[mid].color === 'white') {
-            if (p.isKing || !damaBoard[mid].isKing) {
-              jumps.push({from, to: jto, mid: mid});
-            }
-          }
-        });
+
+    function executeDamaMove(from, to, midIdx, isJump) {
+      isGameActive = true;
+      damaBoard[to] = damaBoard[from];
+      damaBoard[from] = null;
+
+      if (midIdx !== null && midIdx !== undefined) damaBoard[midIdx] = null;
+
+      if (Math.floor(to / 8) === (damaBoard[to].color === 'white' ? 0 : 7)) {
+        damaBoard[to].isKing = true;
+      }
+
+      broadcastData({
+        type: 'game_move',
+        game: 'dama',
+        action: 'move',
+        from: from,
+        to: to,
+        mid: midIdx
       });
 
-      let chosenMove = jumps.length > 0 ? jumps[Math.floor(Math.random()*jumps.length)] : (simpleMoves.length > 0 ? simpleMoves[Math.floor(Math.random()*simpleMoves.length)] : null);
-
-      if (chosenMove) {
-        if (jumps.length > 0 && chosenMove.mid === null) {
-          damaBoard[jumps[0].from] = null;
-          document.getElementById('statusMsg').textContent = `💨 SOFFIO SU ${opponentName}! Ha mancato la presa ed ha perso la pedina!`;
-        }
-        
-        if (damaBoard[chosenMove.from]) {
-          damaBoard[chosenMove.to] = damaBoard[chosenMove.from];
-          damaBoard[chosenMove.from] = null;
-          if (chosenMove.mid !== null) damaBoard[chosenMove.mid] = null;
-          if (Math.floor(chosenMove.to/8) === 7) damaBoard[chosenMove.to].isKing = true;
+      // Controlla se è possibile una presa multipla
+      if (isJump) {
+        let nextJumps = getJumpsForPiece(damaBoard, to);
+        if (nextJumps.length > 0) {
+          damaMultiJumpPiece = to;
+          selectedDamaCell = to;
+          document.getElementById('statusMsg').textContent = `🔥 Presa multipla! Mangia la seconda o terza pedina!`;
+          renderDamaBoard();
+          return;
         }
       }
+
+      damaMultiJumpPiece = null;
+      selectedDamaCell = null;
       renderDamaBoard();
 
+      let blackCount = damaBoard.filter(p => p && p.color === 'black').length;
+      if (blackCount === 0) { showGameResult(true, playerName, opponentName); addWin('dama'); return; }
+
+      if (damaBoard[to].color === 'white' && document.getElementById('opponentMode').value === 'bot') {
+        setTimeout(botDamaMove, 500);
+      }
+    }
+
+    function botDamaMove() {
+      let blackJumps = getAllJumpsForColor(damaBoard, 'black');
+
+      if (blackJumps.length > 0) {
+        let jump = blackJumps[Math.floor(Math.random() * blackJumps.length)];
+        executeDamaMoveBot(jump.from, jump.to, jump.mid);
+      } else {
+        let simpleMoves = [];
+        for (let i = 0; i < 64; i++) {
+          let p = damaBoard[i];
+          if (p && p.color === 'black') {
+            let r = Math.floor(i / 8), c = i % 8;
+            let dirs = p.isKing ? [[-1,-1],[-1,1],[1,-1],[1,1]] : [[1,-1],[1,1]];
+            dirs.forEach(([dr, dc]) => {
+              let nr = r + dr, nc = c + dc;
+              if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && damaBoard[nr * 8 + nc] === null) {
+                simpleMoves.push({ from: i, to: nr * 8 + nc, mid: null });
+              }
+            });
+          }
+        }
+
+        if (simpleMoves.length > 0) {
+          let move = simpleMoves[Math.floor(Math.random() * simpleMoves.length)];
+          executeDamaMoveBot(move.from, move.to, null);
+        }
+      }
+    }
+
+    function executeDamaMoveBot(from, to, midIdx) {
+      damaBoard[to] = damaBoard[from];
+      damaBoard[from] = null;
+      if (midIdx !== null && midIdx !== undefined) damaBoard[midIdx] = null;
+
+      if (Math.floor(to / 8) === 7) damaBoard[to].isKing = true;
+
+      if (midIdx !== null) {
+        let nextJumps = getJumpsForPiece(damaBoard, to);
+        if (nextJumps.length > 0) {
+          renderDamaBoard();
+          setTimeout(() => {
+            let nextJump = nextJumps[Math.floor(Math.random() * nextJumps.length)];
+            executeDamaMoveBot(nextJump.from, nextJump.to, nextJump.mid);
+          }, 500);
+          return;
+        }
+      }
+
+      renderDamaBoard();
       let whiteCount = damaBoard.filter(p => p && p.color === 'white').length;
       if (whiteCount === 0) { showGameResult(false, opponentName, playerName); addOpponentWin('dama'); }
     }
@@ -1096,9 +1206,7 @@
       nccSpinning = true; document.getElementById('spinBtn').disabled = true;
       const randomIdx = Math.floor(Math.random() * nccAlphabet.length);
       nccCurrentLetter = nccAlphabet[randomIdx];
-      if (document.getElementById('opponentMode').value === 'online' && peerConn && peerConn.open) {
-        peerConn.send({ type: 'ncc_spin', letter: nccCurrentLetter });
-      }
+      broadcastData({ type: 'ncc_spin', letter: nccCurrentLetter });
       executeWheelAnimation(randomIdx);
     }
     function receiveRemoteSpin(letter) {
@@ -1129,7 +1237,7 @@
     }
     function triggerNccStop() {
       document.getElementById('stopNccBtn').style.display = 'none';
-      if (document.getElementById('opponentMode').value === 'online' && peerConn && peerConn.open) peerConn.send({ type: 'ncc_stop' });
+      broadcastData({ type: 'ncc_stop' });
       startNccCountdown();
     }
     function receiveRemoteNccStop() { document.getElementById('stopNccBtn').style.display = 'none'; startNccCountdown(); }
@@ -1154,7 +1262,7 @@
         MESTIERE: document.getElementById('field_MESTIERE').value.trim(), FRUTTA: document.getElementById('field_FRUTTA').value.trim()
       };
       if (document.getElementById('opponentMode').value === 'online') {
-        if (peerConn && peerConn.open) peerConn.send({ type: 'ncc_submit', words: myWords });
+        broadcastData({ type: 'ncc_submit', words: myWords });
         if (nccRemoteWords) evaluateNccMatch(myWords, nccRemoteWords);
         else { document.getElementById('statusMsg').textContent = "In attesa delle risposte..."; window.myPendingNccWords = myWords; }
       } else {
@@ -1450,7 +1558,7 @@
     }
 
     // ==========================================
-    // 6. IMPICCATO (MOSTRA PAROLA A FINE PARTITA)
+    // 6. IMPICCATO
     // ==========================================
     let impWord = '', impGuessed = [], impMistakes = 0;
     const impDictionary = ["ARCHITETTURA", "BIBLIOTECA", "COMPUTER", "DIZIONARIO", "ELEFANTE", "FILOSOFIA", "GIORNALE", "IMMAGINAZIONE", "LABIRINTO", "MONTAGNA", "NAVIGATORE", "ORCHESTRA", "PSICOLOGIA", "QUADRO", "RISTORANTE", "SCULTURA", "TELEFONO", "UNIVERSITA", "VELOCIPEDE", "ZAINO", "CARNEVALE", "DESIDERIO", "ENERGIA", "FANTASIA", "GALASSIA", "ILLUSIONE", "MARAVIGLIA", "NOSTALGIA", "ORIZZONTE", "PARADISO", "RIVOLUZIONE", "SIMPATIA", "TEMPESTA", "VACANZA"];
@@ -1553,7 +1661,7 @@
       if (checkTrisWin('X')) { showGameResult(true, playerName, opponentName); addWin('tris'); return; }
       
       if (document.getElementById('opponentMode').value === 'online') {
-        sendPeerMove({ game: 'tris', index: i });
+        broadcastData({ type: 'game_move', game: 'tris', index: i });
       } else {
         let avail = trisBoard.map((c, idx) => c === '' ? idx : null).filter(v => v !== null);
         if (avail.length === 0) return;
