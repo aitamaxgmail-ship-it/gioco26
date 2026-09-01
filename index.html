@@ -277,6 +277,9 @@
   </div>
 
   <script>
+    // --- STATO PARTITA IN CORSO ---
+    let isGameActive = false;
+
     // --- SINTETIZZATORE AUDIO SAFARI-SAFE ---
     let audioCtx = null;
     function getAudioCtx() {
@@ -341,6 +344,7 @@
     }
 
     function showGameResult(isWin, winnerName, loserName) {
+      isGameActive = false;
       const banner = document.getElementById('resultBanner');
       banner.style.display = 'block';
       if(isWin) {
@@ -410,16 +414,24 @@
     let currentGame = 'battaglia';
     
     function switchGame(gameKey, btnElement) {
+      if (isGameActive) {
+        if (!confirm("Hai una partita in corso! Vuoi davvero cambiare gioco ed uscire?")) return;
+      }
+      isGameActive = false;
       currentGame = gameKey;
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       if (btnElement) {
         btnElement.classList.add('active');
       }
       document.getElementById('ruleLimitTag').textContent = `Capacità: ${GAME_RULES[gameKey].maxPlayers}`;
-      resetCurrentGame();
+      resetCurrentGame(true);
     }
     
-    function resetCurrentGame() {
+    function resetCurrentGame(force = false) {
+      if (!force && isGameActive) {
+        if (!confirm("Hai una partita in corso! Vuoi davvero abbandonare e ricominciare?")) return;
+      }
+      isGameActive = false;
       hideResultBanner();
       if(typeof nccTimerInterval !== 'undefined' && nccTimerInterval) clearInterval(nccTimerInterval);
       const container = document.getElementById('gameContainer');
@@ -435,33 +447,144 @@
       else if (currentGame === 'tris') initTris();
     }
 
-    // --- PEERJS ---
+    // --- PEERJS MULTIGIOCATORE ---
     let peer = null, peerConn = null, myPeerId = "";
     function initPeer() {
       try {
         const randomId = "gioco26-" + Math.floor(1000 + Math.random() * 9000);
-        peer = new Peer(randomId);
-        peer.on('open', (id) => { myPeerId = id; document.getElementById('myPeerId').textContent = id; });
-        peer.on('connection', (conn) => { peerConn = conn; setupPeerListeners(); });
-      } catch(e) {}
+        peer = new Peer(randomId, {
+          debug: 2,
+          config: {
+            iceServers: [
+              { urls: 'stun:stun.l.google.com:19302' },
+              { urls: 'stun:stun1.l.google.com:19302' }
+            ]
+          }
+        });
+        peer.on('open', (id) => { 
+          myPeerId = id; 
+          document.getElementById('myPeerId').textContent = id; 
+        });
+        peer.on('connection', (conn) => { 
+          peerConn = conn; 
+          setupPeerListeners(); 
+        });
+        peer.on('disconnected', () => {
+          if (peer && !peer.destroyed) {
+            peer.reconnect();
+          }
+        });
+        peer.on('error', (err) => { 
+          console.error("PeerJS Error:", err);
+          addChatMessage("Sistema", "⚠️ Impossibile connettersi al server: " + err.type);
+        });
+      } catch(e) {
+        console.error("Init Peer Error:", e);
+      }
     }
+
     function connectToPeer() {
       const targetId = document.getElementById('targetPeerInput').value.trim();
-      if (targetId && peer) peerConn = peer.connect(targetId);
-      setupPeerListeners();
+      if (!targetId) { alert("Inserisci prima il codice di un amico!"); return; }
+      if (peer) {
+        if (peer.disconnected) {
+          peer.reconnect();
+        }
+        if (peerConn) {
+          try { peerConn.close(); } catch(e){}
+        }
+        peerConn = peer.connect(targetId, { reliable: true });
+        setupPeerListeners();
+      }
     }
+
     function setupPeerListeners() {
       if(!peerConn) return;
-      peerConn.on('open', () => addChatMessage("Sistema", "Connessione gioco26 Stabilita!"));
+      const onOpen = () => {
+        addChatMessage("Sistema", "🔗 Connessione gioco26 Stabilita!");
+        document.getElementById('opponentMode').value = 'online';
+        peerConn.send({ type: 'handshake', name: playerName });
+      };
+
+      if (peerConn.open) {
+        onOpen();
+      } else {
+        peerConn.on('open', onOpen);
+      }
+
       peerConn.on('data', (data) => {
-        if(data.type==='chat') addChatMessage(data.sender, data.text);
-        else if(data.type==='naval_config') applyRemoteNavalConfig(data);
-        else if(data.type==='ncc_spin') receiveRemoteSpin(data.letter);
-        else if(data.type==='ncc_stop') receiveRemoteNccStop();
-        else if(data.type==='ncc_submit') receiveRemoteNccSubmit(data.words);
+        if (data.type === 'handshake') {
+          opponentName = data.name;
+          document.getElementById('opponentNameInput').value = opponentName;
+          document.getElementById('opponentMode').value = 'online';
+          renderScoreboard();
+          addChatMessage("Sistema", `🎮 ${opponentName} si è connesso!`);
+          peerConn.send({ type: 'handshake_ack', name: playerName });
+        } else if (data.type === 'handshake_ack') {
+          opponentName = data.name;
+          document.getElementById('opponentNameInput').value = opponentName;
+          renderScoreboard();
+        } else if (data.type === 'chat') {
+          addChatMessage(data.sender, data.text);
+        } else if (data.type === 'game_move') {
+          handleRemoteMove(data);
+        } else if (data.type === 'ncc_spin') {
+          receiveRemoteSpin(data.letter);
+        } else if (data.type === 'ncc_stop') {
+          receiveRemoteNccStop();
+        } else if (data.type === 'ncc_submit') {
+          receiveRemoteNccSubmit(data.words);
+        }
+      });
+
+      peerConn.on('close', () => {
+        addChatMessage("Sistema", "❌ Connessione interrotta.");
+      });
+      peerConn.on('error', (err) => {
+        console.error("PeerConn Error:", err);
       });
     }
+
+    function sendPeerMove(moveData) {
+      if (document.getElementById('opponentMode').value === 'online' && peerConn && peerConn.open) {
+        peerConn.send({ type: 'game_move', game: currentGame, ...moveData });
+      }
+    }
+
+    function handleRemoteMove(data) {
+      if (data.game !== currentGame) return;
+      if (data.game === 'tris') {
+        trisBoard[data.index] = 'O';
+        renderTris();
+        if (checkTrisWin('O')) { showGameResult(false, opponentName, playerName); addOpponentWin('tris'); }
+      } else if (data.game === 'dama') {
+        damaBoard[data.to] = damaBoard[data.from];
+        damaBoard[data.from] = null;
+        if (data.mid !== null && data.mid !== undefined) damaBoard[data.mid] = null;
+        if (Math.floor(data.to / 8) === 7) damaBoard[data.to].isKing = true;
+        renderDamaBoard();
+        let whiteCount = damaBoard.filter(p => p && p.color === 'white').length;
+        if (whiteCount === 0) { showGameResult(false, opponentName, playerName); addOpponentWin('dama'); }
+      } else if (data.game === 'battaglia') {
+        if (data.action === 'shoot') {
+          let idx = data.index;
+          if (navalPlayerGrid[idx] > 0) {
+            navalPlayerGrid[idx] = -1; bHits++;
+            if (bHits >= totalShipTiles) { renderNavalBattle(); showGameResult(false, opponentName, playerName); addOpponentWin('battaglia'); }
+          } else { navalPlayerGrid[idx] = -2; }
+          renderNavalBattle();
+        }
+      }
+    }
+
     function handleModeChange() {
+      if (isGameActive) {
+        if (!confirm("Cambiare modalità interromperà la partita in corso. Continuare?")) {
+          document.getElementById('opponentMode').value = (document.getElementById('opponentMode').value === 'bot') ? 'online' : 'bot';
+          return;
+        }
+      }
+      isGameActive = false;
       const mode = document.getElementById('opponentMode').value;
       if(mode === 'bot' && opponentName === "Giocatore 2") {
         document.getElementById('opponentNameInput').value = "Bot";
@@ -471,7 +594,7 @@
         opponentName = "Giocatore 2";
       }
       renderScoreboard();
-      resetCurrentGame(); 
+      resetCurrentGame(true); 
     }
     initPeer();
 
@@ -625,7 +748,7 @@
       });
     }
     function startNavalBattle() {
-      navalPhase = 'battle'; pHits = 0; bHits = 0;
+      navalPhase = 'battle'; pHits = 0; bHits = 0; isGameActive = true;
       document.getElementById('statusMsg').textContent = `Battaglia Avviata! Clicca sulla griglia di ${opponentName}.`;
       renderNavalBattle();
     }
@@ -650,14 +773,21 @@
     }
     function shootNaval(idx) {
       if (navalPhase !== 'battle' || navalBotGrid[idx] < 0) return;
+      isGameActive = true;
       if (navalBotGrid[idx] > 0) {
         let ship = botShipsList.find(s => s.id === navalBotGrid[idx]);
         if (ship) ship.hitCount++;
         navalBotGrid[idx] = -1; pHits++;
         if (pHits >= totalShipTiles) { renderNavalBattle(); showGameResult(true, playerName, opponentName); addWin('battaglia'); navalPhase = 'over'; return; }
       } else { navalBotGrid[idx] = -2; }
-      botShootNaval();
-      if(navalPhase === 'battle') renderNavalBattle();
+
+      if (document.getElementById('opponentMode').value === 'online') {
+        sendPeerMove({ game: 'battaglia', action: 'shoot', index: idx });
+        renderNavalBattle();
+      } else {
+        botShootNaval();
+        if(navalPhase === 'battle') renderNavalBattle();
+      }
     }
     function botShootNaval() {
       let avail = [];
@@ -671,7 +801,7 @@
     }
 
     // ==========================================
-    // 2. DAMA TRADIZIONALE
+    // 2. DAMA TRADIZIONALE (REGOLE ITALIANE CORRETTE)
     // ==========================================
     let damaBoard = [], selectedDamaCell = null;
     function initDamaEngine() {
@@ -684,7 +814,7 @@
           }
         }
       }
-      document.getElementById('statusMsg').textContent = `Dama Italiana: Muove ${playerName} (Bianchi).`;
+      document.getElementById('statusMsg').textContent = `Dama Italiana: Muove ${playerName} (Bianchi). Le pedine muovono solo in avanti e non mangiano le Dame!`;
       renderDamaBoard();
     }
     function renderDamaBoard() {
@@ -709,21 +839,51 @@
         let from = selectedDamaCell;
         if (piece && piece.color === 'white') { selectedDamaCell = idx; renderDamaBoard(); return; }
         
+        let pFrom = damaBoard[from];
         let rFrom = Math.floor(from/8), cFrom = from%8, rTo = Math.floor(idx/8), cTo = idx%8;
-        let isJump = Math.abs(rTo - rFrom) === 2 && Math.abs(cTo - cFrom) === 2;
-        let isSimple = Math.abs(rTo - rFrom) === 1 && Math.abs(cTo - cFrom) === 1;
+        let dr = rTo - rFrom, dc = cTo - cFrom;
+        
+        let isValidMove = false;
+        let isJump = false;
+        let midIdx = null;
 
-        if (isSimple && damaBoard[idx] === null && (rTo < rFrom || damaBoard[from].isKing)) {
+        if (damaBoard[idx] === null) {
+          if (pFrom.isKing) {
+            if (Math.abs(dr) === 1 && Math.abs(dc) === 1) {
+              isValidMove = true;
+            } else if (Math.abs(dr) === 2 && Math.abs(dc) === 2) {
+              midIdx = ((rFrom + rTo)/2)*8 + ((cFrom + cTo)/2);
+              if (damaBoard[midIdx] && damaBoard[midIdx].color === 'black') {
+                isValidMove = true; isJump = true;
+              }
+            }
+          } else {
+            // Regola Italiana: Pedine bianche muovono solo in avanti (dr = -1) e mangiano avanti (dr = -2)
+            if (dr === -1 && Math.abs(dc) === 1) {
+              isValidMove = true;
+            } else if (dr === -2 && Math.abs(dc) === 2) {
+              midIdx = ((rFrom + rTo)/2)*8 + ((cFrom + cTo)/2);
+              // Le pedine non possono mangiare la Dama (Re) avversaria
+              if (damaBoard[midIdx] && damaBoard[midIdx].color === 'black' && !damaBoard[midIdx].isKing) {
+                isValidMove = true; isJump = true;
+              }
+            }
+          }
+        }
+
+        if (isValidMove) {
+          isGameActive = true;
           damaBoard[idx] = damaBoard[from]; damaBoard[from] = null;
+          if (isJump && midIdx !== null) damaBoard[midIdx] = null;
           if (rTo === 0) damaBoard[idx].isKing = true;
           selectedDamaCell = null; renderDamaBoard();
-          setTimeout(botDamaMove, 500);
-        } else if (isJump && damaBoard[idx] === null) {
-          let midIdx = ((rFrom + rTo)/2)*8 + ((cFrom + cTo)/2);
-          if (damaBoard[midIdx] && damaBoard[midIdx].color === 'black') {
-            damaBoard[idx] = damaBoard[from]; damaBoard[from] = null; damaBoard[midIdx] = null;
-            if (rTo === 0) damaBoard[idx].isKing = true;
-            selectedDamaCell = null; renderDamaBoard();
+
+          let blackCount = damaBoard.filter(p => p && p.color === 'black').length;
+          if (blackCount === 0) { showGameResult(true, playerName, opponentName); addWin('dama'); return; }
+
+          sendPeerMove({ game: 'dama', from: from, to: idx, mid: isJump ? midIdx : null });
+
+          if (document.getElementById('opponentMode').value === 'bot') {
             setTimeout(botDamaMove, 500);
           }
         } else { selectedDamaCell = null; renderDamaBoard(); }
@@ -734,24 +894,43 @@
       for (let i=0; i<64; i++) if(damaBoard[i] && damaBoard[i].color==='black') blackPieces.push(i);
       if(blackPieces.length === 0) { showGameResult(true, playerName, opponentName); addWin('dama'); return; }
       
-      let moves = [];
+      let jumps = [], simpleMoves = [];
       blackPieces.forEach(from => {
+        let p = damaBoard[from];
         let r = Math.floor(from/8), c = from%8;
-        [[-1,-1],[-1,1],[1,-1],[1,1]].forEach(([dr,dc]) => {
-          let nr=r+dr, nc=c+dc, to=nr*8+nc;
-          if(nr>=0&&nr<8&&nc>=0&&nc<8 && damaBoard[to]===null && (dr>0||damaBoard[from].isKing)) moves.push({from, to});
+        let dirs = p.isKing ? [[-1,-1],[-1,1],[1,-1],[1,1]] : [[1,-1],[1,1]];
+        
+        dirs.forEach(([dr,dc]) => {
+          let nr = r + dr, nc = c + dc, to = nr*8 + nc;
+          if (nr>=0 && nr<8 && nc>=0 && nc<8 && damaBoard[to] === null) {
+            simpleMoves.push({from, to, mid: null});
+          }
+          let jnr = r + dr*2, jnc = c + dc*2, jto = jnr*8 + jnc;
+          let mid = (r+dr)*8 + (c+dc);
+          if (jnr>=0 && jnr<8 && jnc>=0 && jnc<8 && damaBoard[jto] === null && damaBoard[mid] && damaBoard[mid].color === 'white') {
+            if (p.isKing || !damaBoard[mid].isKing) {
+              jumps.push({from, to: jto, mid: mid});
+            }
+          }
         });
       });
-      if(moves.length > 0) {
-        let m = moves[Math.floor(Math.random()*moves.length)];
-        damaBoard[m.to] = damaBoard[m.from]; damaBoard[m.from] = null;
-        if(Math.floor(m.to/8)===7) damaBoard[m.to].isKing = true;
+
+      let chosenMove = jumps.length > 0 ? jumps[Math.floor(Math.random()*jumps.length)] : (simpleMoves.length > 0 ? simpleMoves[Math.floor(Math.random()*simpleMoves.length)] : null);
+
+      if (chosenMove) {
+        damaBoard[chosenMove.to] = damaBoard[chosenMove.from];
+        damaBoard[chosenMove.from] = null;
+        if (chosenMove.mid !== null) damaBoard[chosenMove.mid] = null;
+        if (Math.floor(chosenMove.to/8) === 7) damaBoard[chosenMove.to].isKing = true;
       }
       renderDamaBoard();
+
+      let whiteCount = damaBoard.filter(p => p && p.color === 'white').length;
+      if (whiteCount === 0) { showGameResult(false, opponentName, playerName); addOpponentWin('dama'); }
     }
 
     // ==========================================
-    // 3. NOMI COSE CITTA
+    // 3. NOMI COSE CITTA (CLASSIFICA MOBILE FISSA)
     // ==========================================
     let nccCurrentLetter = '', nccSpinning = false, nccTimerInterval = null, nccTimeLeft = 30, nccRemoteWords = null;
     let nccCumulativeScores = {};
@@ -797,11 +976,37 @@
             <div class="ncc-field-box"><label>6. Frutta</label><input type="text" id="field_FRUTTA" class="ncc-field-input" disabled></div>
           </div>
           
-          <div id="nccResultsArea" style="width:100%; overflow-x:auto;"></div>
+          <div id="nccResultsArea" style="width:100%; overflow-x:auto; margin-top:0.4rem;"></div>
         </div>
       `;
       drawWheel(0);
+      renderInitialNccTable();
     }
+
+    function renderInitialNccTable() {
+      const area = document.getElementById('nccResultsArea');
+      if (!area) return;
+      area.innerHTML = `
+        <table class="ncc-grid-table">
+          <thead>
+            <tr><th>Giocatore</th><th>Nome</th><th>Cosa</th><th>Città</th><th>Animale</th><th>Mestiere</th><th>Frutta</th><th>Mano</th><th class="total-pts-col">TOTALE</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="ncc-player-row-title">${playerName}</td>
+              <td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td>
+              <td style="font-weight:bold;">0</td><td class="total-pts-col">${nccCumulativeScores[playerName] || 0} pt</td>
+            </tr>
+            <tr>
+              <td class="ncc-player-row-title">${opponentName}</td>
+              <td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td>
+              <td style="font-weight:bold;">0</td><td class="total-pts-col">${nccCumulativeScores[opponentName] || 0} pt</td>
+            </tr>
+          </tbody>
+        </table>
+      `;
+    }
+
     function drawWheel(angle) {
       const canvas = document.getElementById('wheelCanvas');
       if (!canvas) return;
@@ -816,6 +1021,7 @@
     }
     function spinNccWheel() {
       if (nccSpinning) return;
+      isGameActive = true;
       nccSpinning = true; document.getElementById('spinBtn').disabled = true;
       const randomIdx = Math.floor(Math.random() * nccAlphabet.length);
       nccCurrentLetter = nccAlphabet[randomIdx];
@@ -1018,6 +1224,7 @@
     }
     function playPlayerBriscolaCard(idx) {
       if (bTurn !== 'player' || bIsProcessingTrick) return;
+      isGameActive = true;
       bPlayedThisTrick.push({ playedBy: 'player', card: bPlayerHand.splice(idx, 1)[0] });
       renderBriscolaBoard();
       if (bPlayedThisTrick.length === 1) { bTurn = 'bot'; setTimeout(botBriscolaPlay, 600); }
@@ -1111,6 +1318,7 @@
     }
     function playPlayerScopaCard(idx) {
       if (sTurn !== 'player' || sIsProcessing) return;
+      isGameActive = true;
       let card = sPlayerHand.splice(idx, 1)[0];
       let caps = findScopaCaptures(card, sTable);
       if (caps.length === 0) {
@@ -1171,7 +1379,7 @@
     }
 
     // ==========================================
-    // 6. IMPICCATO
+    // 6. IMPICCATO (MOSTRA PAROLA A FINE PARTITA)
     // ==========================================
     let impWord = '', impGuessed = [], impMistakes = 0;
     const impDictionary = ["ARCHITETTURA", "BIBLIOTECA", "COMPUTER", "DIZIONARIO", "ELEFANTE", "FILOSOFIA", "GIORNALE", "IMMAGINAZIONE", "LABIRINTO", "MONTAGNA", "NAVIGATORE", "ORCHESTRA", "PSICOLOGIA", "QUADRO", "RISTORANTE", "SCULTURA", "TELEFONO", "UNIVERSITA", "VELOCIPEDE", "ZAINO", "CARNEVALE", "DESIDERIO", "ENERGIA", "FANTASIA", "GALASSIA", "ILLUSIONE", "MARAVIGLIA", "NOSTALGIA", "ORIZZONTE", "PARADISO", "RIVOLUZIONE", "SIMPATIA", "TEMPESTA", "VACANZA"];
@@ -1201,16 +1409,24 @@
       }
     }
     function startImpGame() {
+      isGameActive = true;
       document.getElementById('impGameArea').style.display = 'flex';
       renderImpBoard();
     }
     function renderImpBoard() {
       const area = document.getElementById('impGameArea');
+      let isGameOver = impMistakes >= 6;
       let wordDisplay = impWord.split('').map(l => impGuessed.includes(l) ? l : '_').join(' ');
-      let slotsHtml = impWord.split('').map(l => `<div class="letter-slot">${impGuessed.includes(l) ? l : ''}</div>`).join('');
+      
+      let slotsHtml = impWord.split('').map(l => {
+        let isGuessed = impGuessed.includes(l);
+        let showLetter = isGuessed || isGameOver;
+        let style = (!isGuessed && isGameOver) ? 'color: #ef4444;' : '';
+        return `<div class="letter-slot" style="${style}">${showLetter ? l : ''}</div>`;
+      }).join('');
       
       let kbHtml = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split('').map(l => `
-        <button class="kb-key" ${impGuessed.includes(l)?'disabled':''} onclick="guessImpLetter('${l}')">${l}</button>
+        <button class="kb-key" ${impGuessed.includes(l) || isGameOver ? 'disabled' : ''} onclick="guessImpLetter('${l}')">${l}</button>
       `).join('');
 
       area.innerHTML = `
@@ -1235,6 +1451,7 @@
       if (!wordDisplay.includes('_')) {
         showGameResult(true, playerName, opponentName); addWin('impiccato');
       } else if (impMistakes >= 6) {
+        document.getElementById('statusMsg').textContent = `💥 Peccato! La parola era: ${impWord}`;
         showGameResult(false, opponentName, playerName); addOpponentWin('impiccato');
       }
     }
@@ -1260,13 +1477,19 @@
     }
     function playTris(i) {
       if (trisBoard[i] !== '') return;
+      isGameActive = true;
       trisBoard[i] = 'X'; renderTris();
       if (checkTrisWin('X')) { showGameResult(true, playerName, opponentName); addWin('tris'); return; }
-      let avail = trisBoard.map((c, idx) => c === '' ? idx : null).filter(v => v !== null);
-      if (avail.length === 0) return;
-      let botPick = avail[Math.floor(Math.random() * avail.length)];
-      trisBoard[botPick] = 'O'; renderTris();
-      if (checkTrisWin('O')) { showGameResult(false, opponentName, playerName); addOpponentWin('tris'); }
+      
+      if (document.getElementById('opponentMode').value === 'online') {
+        sendPeerMove({ game: 'tris', index: i });
+      } else {
+        let avail = trisBoard.map((c, idx) => c === '' ? idx : null).filter(v => v !== null);
+        if (avail.length === 0) return;
+        let botPick = avail[Math.floor(Math.random() * avail.length)];
+        trisBoard[botPick] = 'O'; renderTris();
+        if (checkTrisWin('O')) { showGameResult(false, opponentName, playerName); addOpponentWin('tris'); }
+      }
     }
     function checkTrisWin(p) {
       const wins = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
@@ -1274,7 +1497,7 @@
     }
 
     // Avvio Predefinito
-    resetCurrentGame();
+    resetCurrentGame(true);
   </script>
 </body>
 </html>
