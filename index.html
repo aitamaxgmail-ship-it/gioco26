@@ -490,7 +490,7 @@
       else if (currentGame === 'tris') initTris();
     }
 
-    // --- PEERJS CANALE UNICO BASATO SU PASSWORD ---
+    // --- PEERJS CANALE UNICO CON MULTI-STUN SERVERS ---
     let peer = null, peerConn = null, myPeerId = "", roomPeers = [], isHost = false;
 
     function submitChannelLogin() {
@@ -515,10 +515,20 @@
       peerConn = null;
 
       const hostId = "gioco26-room-" + pass;
+      const peerOptions = {
+        config: {
+          iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'stun:stun2.l.google.com:19302' },
+            { urls: 'stun:stun3.l.google.com:19302' },
+            { urls: 'stun:stun4.l.google.com:19302' },
+            { urls: 'stun:global.stun.twilio.com:3478' }
+          ]
+        }
+      };
       
-      peer = new Peer(hostId, {
-        config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
-      });
+      peer = new Peer(hostId, peerOptions);
 
       peer.on('open', (id) => { 
         isHost = true;
@@ -527,7 +537,9 @@
         addChatMessage("Sistema", `👑 Sei l'host del canale '${channelPassword}'! In attesa di altri giocatori...`);
         
         peer.on('connection', (conn) => { 
-          roomPeers.push(conn);
+          if (!roomPeers.some(p => p.peer === conn.peer)) {
+            roomPeers.push(conn);
+          }
           setupPeerConnection(conn); 
         });
       });
@@ -536,15 +548,13 @@
         if (err.type === 'unavailable-id') {
           // L'host esiste già: ci colleghiamo come Client al Canale
           const clientId = "gioco26-usr-" + pass + "-" + Math.floor(1000 + Math.random() * 9000);
-          peer = new Peer(clientId, {
-            config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
-          });
+          peer = new Peer(clientId, peerOptions);
 
           peer.on('open', (id) => {
             isHost = false;
             myPeerId = id;
             document.getElementById('myPeerId').textContent = "CANALE: " + channelPassword;
-            peerConn = peer.connect(hostId);
+            peerConn = peer.connect(hostId, { reliable: true });
             setupPeerConnection(peerConn);
           });
         } else {
@@ -573,6 +583,7 @@
         } else if (data.type === 'handshake_ack') {
           opponentName = data.name;
           document.getElementById('opponentNameInput').value = opponentName;
+          document.getElementById('opponentMode').value = 'online';
           renderScoreboard();
         } else if (data.type === 'chat') {
           addChatMessage(data.sender, data.text);
@@ -613,31 +624,87 @@
 
     function handleRemoteMove(data) {
       if (data.game !== currentGame) return;
+
+      // --- TRIS ---
       if (data.game === 'tris') {
-        trisBoard[data.index] = 'O';
+        trisBoard[data.index] = data.symbol;
+        trisTurn = data.symbol === 'X' ? 'O' : 'X';
         renderTris();
-        if (checkTrisWin('O')) { showGameResult(false, opponentName, playerName); addOpponentWin('tris'); }
-      } else if (data.game === 'dama') {
+        if (checkTrisWin(data.symbol)) {
+          showGameResult(false, opponentName, playerName);
+          addOpponentWin('tris');
+        } else if (!trisBoard.includes('')) {
+          document.getElementById('statusMsg').textContent = "🤝 Pareggio!";
+          isGameActive = false;
+        } else {
+          document.getElementById('statusMsg').textContent = `Tris: Tocca a te!`;
+        }
+      }
+
+      // --- DAMA ---
+      else if (data.game === 'dama') {
         if (data.action === 'soffio') {
           damaBoard[data.soffioIndex] = null;
-          document.getElementById('statusMsg').textContent = `💨 SOFFIO! ${opponentName} ha perso la pedina per mancata presa!`;
+          document.getElementById('statusMsg').textContent = `💨 SOFFIO! ${opponentName} ha perso la pedina!`;
         } else {
           damaBoard[data.to] = damaBoard[data.from];
           damaBoard[data.from] = null;
           if (data.mid !== null && data.mid !== undefined) damaBoard[data.mid] = null;
-          if (Math.floor(data.to / 8) === 7) damaBoard[data.to].isKing = true;
+          if (Math.floor(data.to / 8) === (data.color === 'white' ? 0 : 7)) {
+            damaBoard[data.to].isKing = true;
+          }
+          damaTurn = myDamaColor();
+          document.getElementById('statusMsg').textContent = `Dama: Tocca a te!`;
         }
         renderDamaBoard();
-        let whiteCount = damaBoard.filter(p => p && p.color === 'white').length;
-        if (whiteCount === 0) { showGameResult(false, opponentName, playerName); addOpponentWin('dama'); }
-      } else if (data.game === 'battaglia') {
+        let myCount = damaBoard.filter(p => p && p.color === myDamaColor()).length;
+        if (myCount === 0) { showGameResult(false, opponentName, playerName); addOpponentWin('dama'); }
+      }
+
+      // --- BATTAGLIA NAVALE ---
+      else if (data.game === 'battaglia') {
         if (data.action === 'shoot') {
           let idx = data.index;
-          if (navalPlayerGrid[idx] > 0) {
-            navalPlayerGrid[idx] = -1; bHits++;
-            if (bHits >= totalShipTiles) { renderNavalBattle(); showGameResult(false, opponentName, playerName); addOpponentWin('battaglia'); }
-          } else { navalPlayerGrid[idx] = -2; }
+          let isHit = navalPlayerGrid[idx] > 0;
+          if (isHit) {
+            navalPlayerGrid[idx] = -1;
+            bHits++;
+            broadcastData({ type: 'game_move', game: 'battaglia', action: 'shoot_result', index: idx, result: 'hit' });
+            if (bHits >= totalShipTiles) {
+              renderNavalBattle();
+              showGameResult(false, opponentName, playerName);
+              addOpponentWin('battaglia');
+            }
+          } else {
+            navalPlayerGrid[idx] = -2;
+            broadcastData({ type: 'game_move', game: 'battaglia', action: 'shoot_result', index: idx, result: 'miss' });
+          }
           renderNavalBattle();
+        } else if (data.action === 'shoot_result') {
+          let idx = data.index;
+          if (data.result === 'hit') {
+            navalBotGrid[idx] = -1;
+            pHits++;
+            if (pHits >= totalShipTiles) {
+              renderNavalBattle();
+              showGameResult(true, playerName, opponentName);
+              addWin('battaglia');
+              navalPhase = 'over';
+            }
+          } else {
+            navalBotGrid[idx] = -2;
+          }
+          renderNavalBattle();
+        }
+      }
+
+      // --- IMPICCATO ---
+      else if (data.game === 'impiccato') {
+        if (data.action === 'start') {
+          impWord = data.word;
+          startImpGame();
+        } else if (data.action === 'guess') {
+          guessImpLetter(data.letter, false);
         }
       }
     }
@@ -838,17 +905,16 @@
     function shootNaval(idx) {
       if (navalPhase !== 'battle' || navalBotGrid[idx] < 0) return;
       isGameActive = true;
-      if (navalBotGrid[idx] > 0) {
-        let ship = botShipsList.find(s => s.id === navalBotGrid[idx]);
-        if (ship) ship.hitCount++;
-        navalBotGrid[idx] = -1; pHits++;
-        if (pHits >= totalShipTiles) { renderNavalBattle(); showGameResult(true, playerName, opponentName); addWin('battaglia'); navalPhase = 'over'; return; }
-      } else { navalBotGrid[idx] = -2; }
 
       if (document.getElementById('opponentMode').value === 'online') {
         broadcastData({ type: 'game_move', game: 'battaglia', action: 'shoot', index: idx });
-        renderNavalBattle();
       } else {
+        if (navalBotGrid[idx] > 0) {
+          let ship = botShipsList.find(s => s.id === navalBotGrid[idx]);
+          if (ship) ship.hitCount++;
+          navalBotGrid[idx] = -1; pHits++;
+          if (pHits >= totalShipTiles) { renderNavalBattle(); showGameResult(true, playerName, opponentName); addWin('battaglia'); navalPhase = 'over'; return; }
+        } else { navalBotGrid[idx] = -2; }
         botShootNaval();
         if(navalPhase === 'battle') renderNavalBattle();
       }
@@ -865,12 +931,16 @@
     }
 
     // ==========================================
-    // 2. DAMA TRADIZIONALE ITALIANA (PRESE MULTIPLE E SOFFIO)
+    // 2. DAMA TRADIZIONALE ITALIANA
     // ==========================================
-    let damaBoard = [], selectedDamaCell = null, damaMultiJumpPiece = null;
+    let damaBoard = [], selectedDamaCell = null, damaMultiJumpPiece = null, damaTurn = 'white';
+
+    function myDamaColor() {
+      return (document.getElementById('opponentMode').value === 'online' && !isHost) ? 'black' : 'white';
+    }
 
     function initDamaEngine() {
-      damaBoard = Array(64).fill(null); selectedDamaCell = null; damaMultiJumpPiece = null;
+      damaBoard = Array(64).fill(null); selectedDamaCell = null; damaMultiJumpPiece = null; damaTurn = 'white';
       for(let r=0; r<8; r++) {
         for(let c=0; c<8; c++) {
           if((r+c)%2 === 1) {
@@ -939,8 +1009,8 @@
 
     function handleDamaClick(idx) {
       let piece = damaBoard[idx];
+      let myColor = myDamaColor();
 
-      // Se c'è una presa multipla in corso, obbliga a continuare con la stessa pedina
       if (damaMultiJumpPiece !== null) {
         if (selectedDamaCell !== damaMultiJumpPiece) selectedDamaCell = damaMultiJumpPiece;
         let jumps = getJumpsForPiece(damaBoard, damaMultiJumpPiece);
@@ -948,13 +1018,13 @@
         if (chosenJump) {
           executeDamaMove(chosenJump.from, chosenJump.to, chosenJump.mid, true);
         } else {
-          document.getElementById('statusMsg').textContent = "⚠️ Presa multipla obbligatoria! Devi continuare a mangiare con la stessa pedina.";
+          document.getElementById('statusMsg').textContent = "⚠️ Presa multipla obbligatoria!";
         }
         return;
       }
 
       if (selectedDamaCell === null) {
-        if (piece && piece.color === 'white') {
+        if (piece && piece.color === myColor) {
           selectedDamaCell = idx;
           renderDamaBoard();
         }
@@ -967,13 +1037,13 @@
         let from = selectedDamaCell;
         let pFrom = damaBoard[from];
 
-        if (piece && piece.color === 'white') {
+        if (piece && piece.color === myColor) {
           selectedDamaCell = idx;
           renderDamaBoard();
           return;
         }
 
-        let allAvailableJumps = getAllJumpsForColor(damaBoard, 'white');
+        let allAvailableJumps = getAllJumpsForColor(damaBoard, myColor);
         let pieceJumps = getJumpsForPiece(damaBoard, from);
         let chosenJump = pieceJumps.find(j => j.to === idx);
 
@@ -986,14 +1056,14 @@
           if (pFrom.isKing) {
             if (Math.abs(dr) === 1 && Math.abs(dc) === 1) isSimpleMove = true;
           } else {
-            if (dr === -1 && Math.abs(dc) === 1) isSimpleMove = true;
+            let allowedDr = myColor === 'white' ? -1 : 1;
+            if (dr === allowedDr && Math.abs(dc) === 1) isSimpleMove = true;
           }
         }
 
         if (chosenJump) {
           executeDamaMove(from, idx, chosenJump.mid, true);
         } else if (allAvailableJumps.length > 0) {
-          // Si è provata una mossa normale ignorando una presa -> SOFFIO!
           let soffioPieceIdx = allAvailableJumps[0].from;
           damaBoard[soffioPieceIdx] = null;
           document.getElementById('statusMsg').textContent = `💨 SOFFIO! Mancata presa d'obbligo: la pedina è stata eliminata!`;
@@ -1002,8 +1072,8 @@
           selectedDamaCell = null;
           renderDamaBoard();
           
-          let whiteCount = damaBoard.filter(p => p && p.color === 'white').length;
-          if (whiteCount === 0) { showGameResult(false, opponentName, playerName); addOpponentWin('dama'); }
+          let myRemaining = damaBoard.filter(p => p && p.color === myColor).length;
+          if (myRemaining === 0) { showGameResult(false, opponentName, playerName); addOpponentWin('dama'); }
         } else if (isSimpleMove) {
           executeDamaMove(from, idx, null, false);
         } else {
@@ -1015,12 +1085,13 @@
 
     function executeDamaMove(from, to, midIdx, isJump) {
       isGameActive = true;
+      let movingColor = damaBoard[from].color;
       damaBoard[to] = damaBoard[from];
       damaBoard[from] = null;
 
       if (midIdx !== null && midIdx !== undefined) damaBoard[midIdx] = null;
 
-      if (Math.floor(to / 8) === (damaBoard[to].color === 'white' ? 0 : 7)) {
+      if (Math.floor(to / 8) === (movingColor === 'white' ? 0 : 7)) {
         damaBoard[to].isKing = true;
       }
 
@@ -1030,16 +1101,16 @@
         action: 'move',
         from: from,
         to: to,
-        mid: midIdx
+        mid: midIdx,
+        color: movingColor
       });
 
-      // Controlla se è possibile una presa multipla
       if (isJump) {
         let nextJumps = getJumpsForPiece(damaBoard, to);
         if (nextJumps.length > 0) {
           damaMultiJumpPiece = to;
           selectedDamaCell = to;
-          document.getElementById('statusMsg').textContent = `🔥 Presa multipla! Mangia la seconda o terza pedina!`;
+          document.getElementById('statusMsg').textContent = `🔥 Presa multipla! Mangia la seconda pedina!`;
           renderDamaBoard();
           return;
         }
@@ -1049,10 +1120,11 @@
       selectedDamaCell = null;
       renderDamaBoard();
 
-      let blackCount = damaBoard.filter(p => p && p.color === 'black').length;
-      if (blackCount === 0) { showGameResult(true, playerName, opponentName); addWin('dama'); return; }
+      let enemyColor = movingColor === 'white' ? 'black' : 'white';
+      let enemyCount = damaBoard.filter(p => p && p.color === enemyColor).length;
+      if (enemyCount === 0) { showGameResult(true, playerName, opponentName); addWin('dama'); return; }
 
-      if (damaBoard[to].color === 'white' && document.getElementById('opponentMode').value === 'bot') {
+      if (document.getElementById('opponentMode').value === 'bot' && movingColor === 'white') {
         setTimeout(botDamaMove, 500);
       }
     }
@@ -1111,7 +1183,7 @@
     }
 
     // ==========================================
-    // 3. NOMI COSE CITTA (CLASSIFICA MOBILE FISSA)
+    // 3. NOMI COSE CITTA
     // ==========================================
     let nccCurrentLetter = '', nccSpinning = false, nccTimerInterval = null, nccTimeLeft = 30, nccRemoteWords = null;
     let nccCumulativeScores = {};
@@ -1578,12 +1650,18 @@
     }
     function setupRandomImpWord() {
       impWord = impDictionary[Math.floor(Math.random() * impDictionary.length)];
+      if (document.getElementById('opponentMode').value === 'online') {
+        broadcastData({ type: 'game_move', game: 'impiccato', action: 'start', word: impWord });
+      }
       startImpGame();
     }
     function setupCustomSecretImpWord() {
       let secret = prompt("Inserisci la parola segreta (sarà nascosta):");
       if (secret && secret.trim().length > 1) {
         impWord = secret.trim().toUpperCase().replace(/[^A-Z]/g, '');
+        if (document.getElementById('opponentMode').value === 'online') {
+          broadcastData({ type: 'game_move', game: 'impiccato', action: 'start', word: impWord });
+        }
         startImpGame();
       }
     }
@@ -1634,20 +1712,23 @@
         showGameResult(false, opponentName, playerName); addOpponentWin('impiccato');
       }
     }
-    function guessImpLetter(l) {
+    function guessImpLetter(l, sendRemote = true) {
       if (impGuessed.includes(l)) return;
       impGuessed.push(l);
       if (!impWord.includes(l)) impMistakes++;
+      if (sendRemote && document.getElementById('opponentMode').value === 'online') {
+        broadcastData({ type: 'game_move', game: 'impiccato', action: 'guess', letter: l });
+      }
       renderImpBoard();
     }
 
     // ==========================================
     // 7. TRIS CLASSICO
     // ==========================================
-    let trisBoard = Array(9).fill('');
+    let trisBoard = Array(9).fill(''), trisTurn = 'X';
     function initTris() {
-      trisBoard = Array(9).fill('');
-      document.getElementById('statusMsg').textContent = `Tris: Tocca a te (X).`;
+      trisBoard = Array(9).fill(''); trisTurn = 'X';
+      document.getElementById('statusMsg').textContent = `Tris: Tocca al giocatore X.`;
       renderTris();
     }
     function renderTris() {
@@ -1655,13 +1736,38 @@
       document.getElementById('gameContainer').innerHTML = `<div class="tris-grid">${grid}</div>`;
     }
     function playTris(i) {
+      let mySymbol = (document.getElementById('opponentMode').value === 'online') ? (isHost ? 'X' : 'O') : 'X';
       if (trisBoard[i] !== '') return;
+      if (document.getElementById('opponentMode').value === 'online' && trisTurn !== mySymbol) {
+        document.getElementById('statusMsg').textContent = "⏳ Attendi il turno dell'avversario!";
+        return;
+      }
       isGameActive = true;
-      trisBoard[i] = 'X'; renderTris();
-      if (checkTrisWin('X')) { showGameResult(true, playerName, opponentName); addWin('tris'); return; }
+      trisBoard[i] = mySymbol;
+      trisTurn = mySymbol === 'X' ? 'O' : 'X';
+      renderTris();
+      
+      if (checkTrisWin(mySymbol)) {
+        showGameResult(true, playerName, opponentName);
+        addWin('tris');
+        if (document.getElementById('opponentMode').value === 'online') {
+          broadcastData({ type: 'game_move', game: 'tris', index: i, symbol: mySymbol });
+        }
+        return;
+      }
+
+      if (!trisBoard.includes('')) {
+        document.getElementById('statusMsg').textContent = "🤝 Pareggio!";
+        isGameActive = false;
+        if (document.getElementById('opponentMode').value === 'online') {
+          broadcastData({ type: 'game_move', game: 'tris', index: i, symbol: mySymbol });
+        }
+        return;
+      }
       
       if (document.getElementById('opponentMode').value === 'online') {
-        broadcastData({ type: 'game_move', game: 'tris', index: i });
+        broadcastData({ type: 'game_move', game: 'tris', index: i, symbol: mySymbol });
+        document.getElementById('statusMsg').textContent = `In attesa di ${opponentName}...`;
       } else {
         let avail = trisBoard.map((c, idx) => c === '' ? idx : null).filter(v => v !== null);
         if (avail.length === 0) return;
