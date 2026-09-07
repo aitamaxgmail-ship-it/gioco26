@@ -2567,6 +2567,8 @@ ${p1Total} a ${p2Total}`;
     let NC_GAME = '';
     let NC_ROLE = -1;
     let NC_INVITE_T = null;
+    var NC_INV = { t: {}, all: 0 };      /* a chi abbiamo mandato una sfida e quando */
+    var NC_STARTED = {};                 /* partite 1vs1 gia avviate (mid) */
     const QQ = String.fromCharCode(39);
 
     function ncNick() { return NC_NICK || playerName || 'Giocatore'; }
@@ -2615,6 +2617,7 @@ ${p1Total} a ${p2Total}`;
       try {
         NC_MQTT.publish('gioco26hub/' + NC_ROOM + '/lobby', JSON.stringify({ kind: 'invite', sid: NC_SID, to: sid, name: ncNick(), game: game }));
       } catch (e) {}
+      NC_INV.t[sid] = Date.now();
       if (NC_INVITE_T) clearTimeout(NC_INVITE_T);
       NC_INVITE_T = setTimeout(function () { ncLobbyStat('nessuna risposta alla sfida'); }, 45000);
     }
@@ -2644,6 +2647,7 @@ ${p1Total} a ${p2Total}`;
       try {
         NC_MQTT.publish('gioco26hub/' + NC_ROOM + '/lobby', JSON.stringify({ kind: 'yes', sid: NC_SID, to: sid, game: game, mid: NC_MID, name: ncNick() }));
       } catch (e) {}
+      if (NC_GAME === 'dama') { ncStartMatch('dama', 1, null); }
       ncLobbyStat(game === 'impiccato'
         ? 'iscritto alla partita di ' + opponentName + ': attendi che parta'
         : (game === 'ncc' ? 'iscritto a Nome Cose Citta di ' + opponentName + ': attendi la lettera'
@@ -2702,6 +2706,15 @@ ${p1Total} a ${p2Total}`;
       if (k === 'no') { if (d.to === NC_SID) { ncLobbyStat('ha rifiutato la sfida'); } return; }
       if (k === 'yes') {
         if (d.to !== NC_SID) return;
+        /* ignora chi risponde senza essere stato invitato (bot o estranei) */
+        var _okInv = false;
+        if (NC_INV.all && Date.now() - NC_INV.all < 180000) _okInv = true;
+        if (NC_INV.t[d.sid] && Date.now() - NC_INV.t[d.sid] < 180000) _okInv = true;
+        if (!_okInv) return;
+        if (d.game === 'briscola' || d.game === 'scopa' || d.game === 'dama') {
+          if (NC_STARTED[d.mid]) return;
+          NC_STARTED[d.mid] = 1;
+        }
         NC_PEER = d.sid;
         NC_GAME = d.game || 'briscola';
         NC_ROLE = 0;
@@ -2725,7 +2738,11 @@ ${p1Total} a ${p2Total}`;
         }
         if (d.g === 'bri') { ncBriAct(d.i, true); return; }
         if (d.g === 'sco') { ncScoAct(d.i, true); return; }
-        if (d.g === 'dam') { if (DM && DM.net) dmRemoteMove(d); return; }
+        if (d.g === 'dam') {
+          if ((!DM || !DM.net) && NC_GAME === 'dama') ncStartMatch('dama', 1, null);
+          if (DM && DM.net) dmRemoteMove(d);
+          return;
+        }
         if (d.g === 'imp_start') { ncImpGuestStart(d.players, d.len); return; }
         if (d.g === 'imp_state') { ncImpNetState(d); return; }
         if (d.g === 'imp_guess') { if (IMP && IMP.hostSid === NC_SID) ncImpApply(d.sid, d.letter); return; }
@@ -3162,6 +3179,7 @@ ${p1Total} a ${p2Total}`;
       try {
         NC_MQTT.publish('gioco26hub/' + NC_ROOM + '/lobby', JSON.stringify({ kind: 'invite', sid: NC_SID, to: 'ALL', name: ncNick(), game: game, mid: NC_MID }));
       } catch (e) {}
+      try { NC_INV.all = Date.now(); } catch (eIA) {}
       ncLobbyStat('sfida lanciata a tutta la stanza (massimo 5 giocatori)');
     }
 
@@ -4290,5 +4308,5 @@ font-size:1.2rem; cursor:pointer;" onclick="clickTris(${i}, this)"></div>`).join
  
     resetCurrentGame(); 
   </script> 
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3778b1e2db3ea67',t:'MTc4ODgwMzI5Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body> 
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a377ad6b8a04ea35',t:'MTc4ODgwNDcwMg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body> 
 </html> 
