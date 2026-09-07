@@ -5,8 +5,6 @@
   <meta charset="UTF-8"> 
   <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
   <title>Game & Web Radio Hub - gioco26 Edition</title> 
-  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-  <script src="https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js"></script> 
   <style> 
     :root { 
       --bg-dark: #0f172a; 
@@ -212,10 +210,28 @@ border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 0.75rem; }
     .cb-hand-wrap { position: sticky; bottom: -0.2rem; z-index: 9; padding: .25rem 0; background: var(--panel-bg); }
     .player-hand-zone { justify-content: center; }
     .cb-legend { font-size: .58rem; color: var(--text-muted); }
-  </style> 
+  
+    @media (max-width: 900px) {
+      html, body { height: auto !important; min-height: 100%; overflow: auto !important; display: block !important; }
+      .app-layout { height: auto !important; overflow: visible !important; flex-direction: column; width: 100%; }
+      .main-section { height: auto !important; overflow: visible !important; border-right: none; }
+      .game-card { overflow-y: visible !important; height: auto !important; }
+      .cards-board { max-height: none !important; overflow: visible !important; max-width: 100%; }
+      .cb-hand-wrap { position: static !important; background: transparent !important; }
+      .sidebar-right { width: 100% !important; height: auto !important; overflow: visible !important; border-left: none; }
+      .chat-card, .sidebar-radio { min-height: 240px; }
+      .tab-btn { padding: 0.5rem 0.6rem; font-size: 0.8rem; }
+      .napoletana-card { width: 48px; height: 74px; }
+      .online-box { flex-wrap: wrap; gap: 0.3rem; }
+    }
+    #verBadge { max-width: 70vw; }
+
+    /* MOBILE FIX */
+</style> 
 </head> 
 <body>
-<div id="verBadge" style="position:fixed; right:6px; bottom:6px; z-index:99; background:#0f172a; color:#94a3b8; border:1px solid #334155; font:600 10px monospace; padding:2px 6px; border-radius:6px;">gioco26 v26.9 - chat MQTT</div> 
+<script>window.addEventListener("error", function (e) { var b = document.getElementById("verBadge"); if (b) { b.style.background = "#7f1d1d"; b.style.color = "#fecaca"; b.textContent = "errore JS: " + (e.message || "sconosciuto"); } });</script>
+<div id="verBadge" style="position:fixed; right:6px; bottom:6px; z-index:99; background:#0f172a; color:#94a3b8; border:1px solid #334155; font:600 10px monospace; padding:2px 6px; border-radius:6px;">gioco26 v26.11 - mobile + broker</div> 
  
   <div class="app-layout"> 
      
@@ -543,7 +559,31 @@ ${GAME_RULES[gameKey].maxPlayers}`;
         setTimeout(function () { ncBC({ kind: 'hello', sid: NC_SID }); }, 1500);
       } catch (e) { NC_BC = null; }
     }
+    function ncLoadScript(src) {
+      return new Promise(function (resolve, reject) {
+        const s = document.createElement('script');
+        s.src = src;
+        s.onload = function () { resolve(); };
+        s.onerror = function () { reject(new Error('rete')); };
+        document.head.appendChild(s);
+      });
+    }
+    function ncBootPeer() {
+      if (typeof Peer === 'undefined') {
+        ncLoadScript('https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js').then(function () { initPeer(); }).catch(function () { peerStatus('PeerJS non caricato: chat MQTT e tra schede comunque attive'); });
+        return;
+      }
+      initPeer();
+    }
     function ncMqttStat(t) { const el = document.getElementById('mqttStatus'); if (el) el.textContent = 'mqtt: ' + t; }
+    let NC_URLS = ['wss://broker.emqx.io:8084/mqtt', 'wss://test.mosquitto.org:8081/mqtt', 'wss://broker.hivemq.com:8884/mqtt'];
+    let NC_URLI = 0;
+    let NC_WD = null;
+    function ncMqttNext(room) {
+      NC_URLI++;
+      if (NC_URLI >= NC_URLS.length) { ncMqttStat('nessun broker raggiungibile su questa rete'); return; }
+      ncMqttStart(room);
+    }
     let NC_MQTT = null;
     let NC_ROOM = '';
     let NC_MQTToK = false;
@@ -551,14 +591,22 @@ ${GAME_RULES[gameKey].maxPlayers}`;
       const raw = (document.getElementById('mqttRoomInput').value || 'prova').trim();
       const room = raw.toLowerCase().replace(/[^a-z0-9_-]/g, '') || 'prova';
       NC_ROOM = room;
-      if (typeof mqtt === 'undefined') { ncMqttStat('libreria non caricata'); return; }
+      if (typeof mqtt === 'undefined') {
+        ncMqttStat('carico la libreria...');
+        ncLoadScript('https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js').then(function () { ncMqttStart(room); }).catch(function () { ncMqttStat('libreria non caricata (rete)'); });
+        return;
+      }
+      ncMqttStart(room);
+    }
+    function ncMqttStart(room) {
       ncMqttStat('connessione alla stanza ' + room + '...');
       try {
         if (NC_MQTT) { try { NC_MQTT.end(true); } catch (e) {} }
-        NC_MQTT = mqtt.connect('wss://broker.emqx.io:8084/mqtt', { clientId: 'gioco26-' + NC_SID, clean: true, reconnectPeriod: 3000, connectTimeout: 8000 });
+        NC_MQTT = mqtt.connect(NC_URLS[NC_URLI], { clientId: 'gioco26-' + NC_SID, clean: true, reconnectPeriod: 3000, connectTimeout: 8000 });
       } catch (e) { ncMqttStat('errore libreria'); return; }
       NC_MQTT.on('connect', function () {
         NC_MQTToK = true;
+        if (NC_WD) { clearTimeout(NC_WD); NC_WD = null; }
         ncMqttStat('nella stanza ' + room);
         NC_MQTT.subscribe('gioco26hub/' + room + '/chat', function (e) {
           if (e) { ncMqttStat('errore iscrizione'); return; }
@@ -567,7 +615,14 @@ ${GAME_RULES[gameKey].maxPlayers}`;
         });
       });
       NC_MQTT.on('reconnect', function () { ncMqttStat('riconnessione...'); });
-      NC_MQTT.on('error', function (e) { ncMqttStat('errore: ' + ((e && e.message) ? e.message : 'sconosciuto')); });
+      NC_MQTT.on('error', function (e) {
+        if (NC_MQTToK) { ncMqttStat('errore: ' + ((e && e.message) ? e.message : 'sconosciuto')); return; }
+        ncMqttStat('broker non raggiungibile, provo il successivo...');
+        try { NC_MQTT.end(true); } catch (e2) {}
+        ncMqttNext(room);
+      });
+      if (NC_WD) { clearTimeout(NC_WD); }
+      NC_WD = setTimeout(function () { if (!NC_MQTToK) { try { NC_MQTT.end(true); } catch (e3) {} ncMqttNext(room); } }, 10000);
       NC_MQTT.on('message', function (topic, payload) {
         let d = null;
         try { d = JSON.parse(payload.toString()); } catch (e) { return; }
@@ -646,8 +701,8 @@ ${GAME_RULES[gameKey].maxPlayers}`;
       renderScoreboard(); 
       resetCurrentGame();  
     } 
-    initPeer(); 
     ncInitBC(); 
+    try { if (document.readyState === 'complete') { ncBootPeer(); } else { window.addEventListener('load', ncBootPeer); } } catch (e) { try { ncBootPeer(); } catch (e2) {} } 
  
     // --- CHAT & RADIO --- 
     function addChatMessage(user, text) { 
@@ -2394,5 +2449,5 @@ font-size:1.2rem; cursor:pointer;" onclick="clickTris(${i}, this)"></div>`).join
  
     resetCurrentGame(); 
   </script> 
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a376a570ff5dea4c',t:'MTc4ODc5Mzg4OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body> 
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a376b5528b0fea50',t:'MTc4ODc5NDUzOQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body> 
 </html> 
