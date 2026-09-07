@@ -224,6 +224,8 @@ border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 0.75rem; }
       .napoletana-card { width: 48px; height: 74px; }
       .online-box { flex-wrap: wrap; gap: 0.3rem; }
     }
+    .lobby-row { display: flex; justify-content: space-between; align-items: center; gap: 0.4rem; padding: 0.25rem 0; border-bottom: 1px solid #1e293b; font-size: 0.72rem; }
+    .lobby-row .btn { padding: 0.2rem 0.4rem; font-size: 0.65rem; }
     #verBadge { max-width: 70vw; }
 
     /* MOBILE FIX */
@@ -231,7 +233,7 @@ border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 0.75rem; }
 </head> 
 <body>
 <script>window.addEventListener("error", function (e) { var b = document.getElementById("verBadge"); if (b) { b.style.background = "#7f1d1d"; b.style.color = "#fecaca"; b.textContent = "errore JS: " + (e.message || "sconosciuto"); } });</script>
-<div id="verBadge" style="position:fixed; right:6px; bottom:6px; z-index:99; background:#0f172a; color:#94a3b8; border:1px solid #334155; font:600 10px monospace; padding:2px 6px; border-radius:6px;">gioco26 v26.11 - mobile + broker</div> 
+<div id="verBadge" style="position:fixed; right:6px; bottom:6px; z-index:99; background:#0f172a; color:#94a3b8; border:1px solid #334155; font:600 10px monospace; padding:2px 6px; border-radius:6px;">gioco26 v27.0 - sfide online</div> 
  
   <div class="app-layout"> 
      
@@ -281,7 +283,18 @@ id="myPeerId">Generazione...</span></div>
           <input type="text" id="mqttRoomInput" class="player-input" placeholder="stanza" value="prova" style="width:90px;">
           <button class="btn btn-primary" onclick="ncMqttJoin()">Entra in stanza</button>
           <span id="mqttStatus" class="player-limit-tag" style="background:#0f172a; color:#facc15; border:1px solid #713f12;">mqtt: non collegato</span>
-        </div> 
+        </div>
+        <div style="display:flex; gap:0.3rem; align-items:center; margin-top:0.35rem; flex-wrap:wrap;">
+          <input type="text" id="nickInput" class="player-input" placeholder="il tuo nickname" maxlength="16" style="width:120px;">
+          <button class="btn" onclick="ncSaveNick()">Imposta nickname</button>
+        </div>
+        <div style="margin-top:0.35rem;">
+          <div class="player-limit-tag" style="background:#0f172a; color:#f472b6; border:1px solid #831843;">Sfide online nella stanza</div>
+          <div id="lobbyList" style="margin-top:0.25rem;"></div>
+          <div id="lobbyStatus" style="font-size:0.65rem; color:#94a3b8; margin-top:0.2rem;"></div>
+        </div>
+        <div id="challengeBox" style="display:none; margin-top:0.35rem; padding:0.3rem; background:#0f172a; border:1px solid #a78bfa; border-radius:6px; font-size:0.7rem;"></div>
+ 
       </div> 
  
       <!-- SEGNAPUNTI INDIPENDENTI --> 
@@ -512,8 +525,17 @@ ${loserName}`;
  
     function switchGame(gameKey) { 
       currentGame = gameKey; 
-      document.querySelectorAll(' .tab-btn').forEach(btn => btn.classList.remove('active')); 
-      event.target.classList.add('active'); 
+      const _btns = document.querySelectorAll(".tab-btn");
+      for (const _b of _btns) _b.classList.remove("active");
+      let _tg = null;
+      try { if (typeof event !== "undefined" && event && event.target) _tg = event.target; } catch (eEv) {}
+      if (_tg && _tg.classList) { _tg.classList.add("active"); }
+      else {
+        for (const _b of _btns) {
+          const _oc = (_b.getAttribute && _b.getAttribute("onclick")) || "";
+          if (_oc.indexOf(gameKey) >= 0) { _b.classList.add("active"); break; }
+        }
+      }
       document.getElementById('ruleLimitTag').textContent = `Capacità: 
 ${GAME_RULES[gameKey].maxPlayers}`; 
       resetCurrentGame(); 
@@ -612,6 +634,9 @@ ${GAME_RULES[gameKey].maxPlayers}`;
           if (e) { ncMqttStat('errore iscrizione'); return; }
           NC_MQTT.publish('gioco26hub/' + room + '/chat', JSON.stringify({ kind: 'sys', sid: NC_SID, sender: playerName, text: 'entro nella stanza' }));
           addChatMessage('Sistema', 'Stanza MQTT ' + room + ' attiva: chiunque entri con la stessa stanza legge e scrive qui.');
+          try { NC_MQTT.subscribe('gioco26hub/' + room + '/lobby', function () {}); } catch (e2) {}
+          ncPresence();
+          ncRenderLobby();
         });
       });
       NC_MQTT.on('reconnect', function () { ncMqttStat('riconnessione...'); });
@@ -629,6 +654,7 @@ ${GAME_RULES[gameKey].maxPlayers}`;
         if (!d || d.sid === NC_SID) return;
         if (d.kind === 'sys') { ncMqttStat('nella stanza ' + room + ' (qualcuno e entrato)'); return; }
         if (d.kind === 'chat') { addChatMessage(d.sender, d.text); return; }
+        try { ncNetMsg(topic, d); } catch (eN) { console.log('netmsg', eN); }
       });
     }
     function ncMqttSend(txt) {
@@ -702,6 +728,7 @@ ${GAME_RULES[gameKey].maxPlayers}`;
       resetCurrentGame();  
     } 
     ncInitBC(); 
+    try { ncLobbyBoot(); } catch (eL) {} 
     try { if (document.readyState === 'complete') { ncBootPeer(); } else { window.addEventListener('load', ncBootPeer); } } catch (e) { try { ncBootPeer(); } catch (e2) {} } 
  
     // --- CHAT & RADIO --- 
@@ -2011,6 +2038,7 @@ ${p1Total} a ${p2Total}`;
     }
 
     function playBriscolaCard(i) {
+      if (BR && BR.net) { ncBriAct(i, false); return; }
       if (!BR || BR.over || BR.phase !== 'player') return;
       if (i < 0 || i >= BR.hands[0].length) return;
       const c = BR.hands[0].splice(i, 1)[0];
@@ -2127,10 +2155,10 @@ ${p1Total} a ${p2Total}`;
           endBriscola();
           return;
         }
-        BR.phase = BR.leader === 0 ? 'player' : 'bot';
+        BR.phase = BR.leader === 0 ? 'player' : (BR.net ? 'net' : 'bot');
         ncSetStatus(BR.leader === 0 ? 'Presa tua! Apri la prossima, ' + playerName + '.' : 'Presa di ' + opponentName + ': attendi la sua mossa.');
         renderBriscola();
-        if (BR.leader === 1) ncLater(botBriscolaMove, 1000);
+        if (BR.leader === 1 && !BR.net) ncLater(botBriscolaMove, 1000);
       }, 1500);
     }
 
@@ -2233,6 +2261,7 @@ ${p1Total} a ${p2Total}`;
     }
 
     function playScopaCard(i) {
+      if (SC && SC.net) { ncScoAct(i, false); return; }
       if (!SC || SC.over || SC.phase !== 'player' || SC.turn !== 0) return;
       if (i < 0 || i >= SC.hands[0].length) return;
       const c = SC.hands[0][i];
@@ -2271,8 +2300,10 @@ ${p1Total} a ${p2Total}`;
       if (!SC || SC.over) return;
       if (SC.hands[0].length === 0 && SC.hands[1].length === 0) {
         if (SC.deck.length > 0) {
-          SC.hands[0] = SC.deck.splice(0, 3);
-          SC.hands[1] = SC.deck.splice(0, 3);
+          const p1 = SC.deck.splice(0, 3);
+          const p2 = SC.deck.splice(0, 3);
+          if (SC.net && SC.net.role === 1) { SC.hands[1] = p1; SC.hands[0] = p2; }
+          else { SC.hands[0] = p1; SC.hands[1] = p2; }
           SC.msg += ' Nuova smazzata.';
         } else {
           endScopa();
@@ -2281,9 +2312,9 @@ ${p1Total} a ${p2Total}`;
       }
       SC.turn = t;
       if (t === 1) {
-        SC.phase = 'bot';
+        SC.phase = SC.net ? 'net' : 'bot';
         renderScopa();
-        ncLater(botScopaMove, 1000);
+        if (!SC.net) ncLater(botScopaMove, 1000);
       } else {
         SC.phase = 'player';
         renderScopa();
@@ -2403,6 +2434,279 @@ ${p1Total} a ${p2Total}`;
     }
 
 
+    /* ===== MODALITA ONLINE: SMAZZA DETERMINISTICA E MOSSE DI RETE ===== */
+    function ncOrder() { const a = []; for (let i = 0; i < 40; i++) a.push(i); return ncShuffle(a); }
+    function ncCardsFrom(order) {
+      const out = [];
+      for (const id of order) out.push({ s: NC_SUITS[Math.floor(id / 10)], r: NC_RANKS[id % 10] });
+      return out;
+    }
+    function ncBriDeal(order, guest) {
+      NC_GEN++;
+      ncPrevPtsB = [0, 0];
+      const d = ncCardsFrom(order);
+      const bris = d.shift();
+      const hA = d.splice(0, 3);
+      const hB = d.splice(0, 3);
+      BR = {
+        deck: d,
+        bris: bris,
+        brisSuitStr: bris.s,
+        hands: guest ? [hB, hA] : [hA, hB],
+        pts: [0, 0],
+        taken: [[], []],
+        played: [],
+        history: [],
+        leader: guest ? 1 : 0,
+        table: [],
+        phase: 'idle',
+        over: false,
+        msg: ''
+      };
+      document.getElementById('resultBanner').style.display = 'none';
+      BR.net = { role: guest ? 1 : 0 };
+      BR.phase = guest ? 'net' : 'player';
+      ncSetStatus('Briscola ONLINE contro ' + opponentName + ': briscola ' + NC_LABEL[bris.r] + ' di ' + NC_SUIT_LABEL[bris.s] + '. ' + (guest ? 'Attendi la sua mossa.' : 'Apri tu la prima presa.'));
+      renderBriscola();
+    }
+    function ncScoDeal(order, guest) {
+      NC_GEN++;
+      const d = ncCardsFrom(order);
+      const table = d.splice(0, 4);
+      const hA = d.splice(0, 3);
+      const hB = d.splice(0, 3);
+      SC = {
+        deck: d,
+        table: table,
+        hands: guest ? [hB, hA] : [hA, hB],
+        caps: [[], []],
+        scopas: [0, 0],
+        lastCap: null,
+        turn: guest ? 1 : 0,
+        phase: 'idle',
+        over: false,
+        msg: ''
+      };
+      document.getElementById('resultBanner').style.display = 'none';
+      SC.net = { role: guest ? 1 : 0 };
+      SC.phase = guest ? 'net' : 'player';
+      ncSetStatus('Scopa ONLINE contro ' + opponentName + ': ' + (guest ? 'attendi la sua mossa.' : 'scegli una carta. Se puoi prendere, prendi!'));
+      renderScopa();
+    }
+    function ncBriAct(i, remote) {
+      if (!BR || BR.over) return;
+      const who = remote ? 1 : 0;
+      const hand = BR.hands[who];
+      if (i < 0 || i >= hand.length) return;
+      const c = hand.splice(i, 1)[0];
+      BR.table.push({ c: c, who: who });
+      playSound('flip');
+      BR.msg = (who === 0 ? playerName : opponentName) + ' gioca ' + NC_LABEL[c.r] + ' di ' + NC_SUIT_LABEL[c.s] + '.';
+      if (!remote && typeof ncNetSendAct === 'function') ncNetSendAct({ g: 'bri', i: i });
+      if (BR.table.length < 2) {
+        BR.phase = remote ? 'player' : 'net';
+        renderBriscola();
+      } else {
+        resolveBriscolaTrick();
+      }
+    }
+    function ncScoAct(i, remote) {
+      if (!SC || SC.over) return;
+      const who = remote ? 1 : 0;
+      const hand = SC.hands[who];
+      if (i < 0 || i >= hand.length) return;
+      if (SC.turn !== who) return;
+      if (who === 0) {
+        const anyCapture = hand.some(function (h) { return scFindCapture(h, SC.table); });
+        if (anyCapture && !scFindCapture(hand[i], SC.table)) {
+          SC.msg = 'Regola della scopa: se puoi prendere, devi prendere!';
+          renderScopa();
+          return;
+        }
+      }
+      const c = hand.splice(i, 1)[0];
+      scApplyMove(who, c);
+      if (!remote && typeof ncNetSendAct === 'function') ncNetSendAct({ g: 'sco', i: i });
+      scNext(who === 0 ? 1 : 0);
+    }
+
+
+    /* ===== LOBBY ONLINE: NICKNAME, PRESENZE, SFIDE ===== */
+    let NC_NICK = '';
+    let NC_LOBBY = {};
+    let NC_PEER = null;
+    let NC_MID = '';
+    let NC_GAME = '';
+    let NC_ROLE = -1;
+    let NC_INVITE_T = null;
+    const QQ = String.fromCharCode(39);
+
+    function ncNick() { return NC_NICK || playerName || 'Giocatore'; }
+    function ncLobbyStat(t) { const el = document.getElementById('lobbyStatus'); if (el) el.textContent = t; }
+
+    function ncSaveNick() {
+      const el = document.getElementById('nickInput');
+      NC_NICK = ((el && el.value) || '').trim().slice(0, 16) || 'Giocatore';
+      try { localStorage.setItem('gioco26_nick', NC_NICK); } catch (e) {}
+      playerName = NC_NICK;
+      ncLobbyStat('nickname impostato: ' + NC_NICK);
+      ncPresence();
+      ncRenderLobby();
+    }
+
+    function ncPresence() {
+      if (!NC_MQTT || !NC_MQTToK || !NC_ROOM) return;
+      try {
+        NC_MQTT.publish('gioco26hub/' + NC_ROOM + '/lobby', JSON.stringify({ kind: 'who', sid: NC_SID, name: ncNick() }));
+      } catch (e) {}
+    }
+
+    function ncRenderLobby() {
+      const box = document.getElementById('lobbyList');
+      if (!box) return;
+      const now = Date.now();
+      let html = '';
+      let n = 0;
+      for (const sid in NC_LOBBY) {
+        const p = NC_LOBBY[sid];
+        if (!p || now - p.t > 25000) continue;
+        n++;
+        const nm = String(p.name || 'Giocatore').replace(/[<>&]/g, '');
+        html += '<div class="lobby-row"><span>' + nm + '</span><span>' +
+          '<button class="btn btn-success" onclick="ncInvite(' + QQ + sid + QQ + ',' + QQ + 'briscola' + QQ + ')">Briscola</button> ' +
+          '<button class="btn btn-primary" onclick="ncInvite(' + QQ + sid + QQ + ',' + QQ + 'scopa' + QQ + ')">Scopa</button></span></div>';
+      }
+      box.innerHTML = n ? html : '<div class="lobby-row"><span style="color:#94a3b8;">nessun altro giocatore nella stanza</span></div>';
+    }
+
+    function ncInvite(sid, game) {
+      if (!NC_MQTT || !NC_MQTToK || !NC_ROOM) { ncLobbyStat('prima entra in una stanza MQTT'); return; }
+      const p = NC_LOBBY[sid];
+      ncLobbyStat('sfida a ' + game + ' inviata a ' + (p ? p.name : 'avversario') + '...');
+      try {
+        NC_MQTT.publish('gioco26hub/' + NC_ROOM + '/lobby', JSON.stringify({ kind: 'invite', sid: NC_SID, to: sid, name: ncNick(), game: game }));
+      } catch (e) {}
+      if (NC_INVITE_T) clearTimeout(NC_INVITE_T);
+      NC_INVITE_T = setTimeout(function () { ncLobbyStat('nessuna risposta alla sfida'); }, 45000);
+    }
+
+    function ncShowChallenge(name, sid, game) {
+      const box = document.getElementById('challengeBox');
+      if (!box) return;
+      const nm = String(name || 'Qualcuno').replace(/[<>&]/g, '');
+      box.style.display = 'block';
+      box.innerHTML = '<b>' + nm + '</b> ti sfida a ' + (game === 'scopa' ? 'Scopa' : 'Briscola') +
+        ' <button class="btn btn-success" onclick="ncAccept(' + QQ + sid + QQ + ',' + QQ + game + QQ + ')">Accetta</button>' +
+        ' <button class="btn btn-stop" onclick="ncRefuse(' + QQ + sid + QQ + ')">Rifiuta</button>';
+    }
+
+    function ncAccept(sid, game) {
+      const box = document.getElementById('challengeBox');
+      if (box) { box.style.display = 'none'; box.innerHTML = ''; }
+      NC_PEER = sid;
+      NC_GAME = game;
+      NC_ROLE = 1;
+      NC_MID = 'm' + Math.floor(100000 + Math.random() * 900000);
+      const p = NC_LOBBY[sid];
+      opponentName = (p && p.name) || 'Ospite';
+      ncMqttSubMatch();
+      try {
+        NC_MQTT.publish('gioco26hub/' + NC_ROOM + '/lobby', JSON.stringify({ kind: 'yes', sid: NC_SID, to: sid, game: game, mid: NC_MID, name: ncNick() }));
+      } catch (e) {}
+      ncLobbyStat('sfida accettata: attendi le carte da ' + opponentName + '...');
+    }
+
+    function ncRefuse(sid) {
+      const box = document.getElementById('challengeBox');
+      if (box) { box.style.display = 'none'; box.innerHTML = ''; }
+      try {
+        NC_MQTT.publish('gioco26hub/' + NC_ROOM + '/lobby', JSON.stringify({ kind: 'no', sid: NC_SID, to: sid }));
+      } catch (e) {}
+      ncLobbyStat('sfida rifiutata');
+    }
+
+    function ncMqttSubMatch() {
+      if (!NC_MQTT || !NC_MID || !NC_ROOM) return;
+      try { NC_MQTT.subscribe('gioco26hub/' + NC_ROOM + '/m/' + NC_MID, function () {}); } catch (e) {}
+    }
+
+    function ncNetSendAct(obj) {
+      if (!NC_MQTT || !NC_MQTToK || !NC_MID || !NC_ROOM) return;
+      obj.kind = 'act';
+      obj.sid = NC_SID;
+      obj.mid = NC_MID;
+      try { NC_MQTT.publish('gioco26hub/' + NC_ROOM + '/m/' + NC_MID, JSON.stringify(obj)); } catch (e) {}
+    }
+
+    function ncStartMatch(game, role, order) {
+      NC_ROLE = role;
+      const p = NC_LOBBY[NC_PEER];
+      opponentName = (p && p.name) || 'Ospite';
+      if (game === 'scopa') {
+        switchGame('scopa');
+        ncScoDeal(order, role === 1);
+      } else {
+        switchGame('briscola');
+        ncBriDeal(order, role === 1);
+      }
+      ncLobbyStat('partita in corso: ' + (role === 0 ? 'tocca a te' : 'tocca a ' + opponentName));
+    }
+
+    function ncNetMsg(topic, d) {
+      if (!d) return;
+      const k = d.kind;
+      if (k === 'who') {
+        NC_LOBBY[d.sid] = { name: String(d.name || 'Giocatore').slice(0, 16), t: Date.now() };
+        ncRenderLobby();
+        return;
+      }
+      if (k === 'bye') { delete NC_LOBBY[d.sid]; ncRenderLobby(); return; }
+      if (k === 'invite') { if (d.to === NC_SID) ncShowChallenge(d.name, d.sid, d.game); return; }
+      if (k === 'no') { if (d.to === NC_SID) { ncLobbyStat('ha rifiutato la sfida'); } return; }
+      if (k === 'yes') {
+        if (d.to !== NC_SID) return;
+        NC_PEER = d.sid;
+        NC_GAME = d.game || 'briscola';
+        NC_ROLE = 0;
+        NC_MID = d.mid;
+        const p = NC_LOBBY[d.sid];
+        opponentName = (p && p.name) || d.name || 'Ospite';
+        if (NC_INVITE_T) { clearTimeout(NC_INVITE_T); NC_INVITE_T = null; }
+        ncMqttSubMatch();
+        const order = ncOrder();
+        ncStartMatch(NC_GAME, 0, order);
+        ncNetSendAct({ g: 'deal', order: order });
+        return;
+      }
+      if (k === 'act') {
+        if (!NC_MID || d.mid !== NC_MID) return;
+        if (d.g === 'deal') {
+          ncStartMatch(NC_GAME, 1, d.order);
+          return;
+        }
+        if (d.g === 'bri') { ncBriAct(d.i, true); return; }
+        if (d.g === 'sco') { ncScoAct(d.i, true); return; }
+      }
+    }
+
+    function ncLobbyBoot() {
+      try {
+        const n = localStorage.getItem('gioco26_nick');
+        if (n) {
+          NC_NICK = n;
+          playerName = n;
+          const el = document.getElementById('nickInput');
+          if (el) el.value = n;
+          ncLobbyStat('nickname: ' + n);
+        }
+      } catch (e) {}
+      setInterval(function () { ncPresence(); ncRenderLobby(); }, 5000);
+      window.addEventListener('beforeunload', function () {
+        try { NC_MQTT.publish('gioco26hub/' + NC_ROOM + '/lobby', JSON.stringify({ kind: 'bye', sid: NC_SID })); } catch (e) {}
+      });
+    }
+
+
     // ========================================== 
     // 5. IMPICCATO & TRIS 
     // ========================================== 
@@ -2449,5 +2753,5 @@ font-size:1.2rem; cursor:pointer;" onclick="clickTris(${i}, this)"></div>`).join
  
     resetCurrentGame(); 
   </script> 
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a376b5528b0fea50',t:'MTc4ODc5NDUzOQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body> 
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a37729626f41ea73',t:'MTc4ODc5OTI5Mw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body> 
 </html> 
